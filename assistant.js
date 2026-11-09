@@ -195,6 +195,8 @@
         enLecture.push(u);
         synth.speak(u);
       });
+      // La sphère s'anime dès que la réponse arrive, sans attendre le premier son.
+      emettre('etat', { etat: 'parle' });
       clearTimeout(veille);
       veille = setTimeout(() => {
         if (demarre || g !== generation) return;
@@ -297,7 +299,7 @@
       };
       requestAnimationFrame(pas);
     }
-    if (parle) parler(texte);
+    if (parle) parler(texte); else emettre('texte', { texte: pourLaVoix(texte) });
   }
 
   function ajouterErreur(texte) {
@@ -413,7 +415,7 @@
     }
   }
 
-  function saluer() {
+  function saluer({ parle = true } = {}) {
     salue = true;
     const p = donnees || {};
     const projets = p.projets || [];
@@ -428,7 +430,7 @@
       + (accel.length ? ` Le rapport propose d’accélérer ${liste(accel)}.` : '')
       + (arb.length ? ` ${liste(arb)} ${arb.length > 1 ? 'attendent' : 'attend'} ton arbitrage.` : '')
       + ' Que veux-tu examiner ?';
-    ajouterAssistant(texte);
+    ajouterAssistant(texte, { parle });
     const premieres = ['Résume-moi la situation du jour', 'Quel projet accélérer en priorité ?'];
     if (arb.length >= 2) premieres.push(`${arb[0]} ou ${arb[1]} : que choisir ?`);
     else premieres.push('Qu’est-ce qui bloque en ce moment ?');
@@ -437,6 +439,48 @@
   const liste = (l) => (l.length < 2 ? l.join('') : l.slice(0, -1).join(', ') + ' et ' + l[l.length - 1]);
 
   // ── Ouverture, fermeture, saisie ─────────────────────────────────────────────
+  // En haut de page (grand écran), le chat est posé à droite de la sphère.
+  // Dès que cette zone sort de l'écran, il redevient une bulle en bas à droite.
+  const place = document.getElementById('geri-chat');
+  const grandEcran = window.matchMedia ? matchMedia('(min-width: 1180px)') : { matches: false };
+  let integre = false, placeVisible = true;
+  const autorise = () => !navigator.userActivation || navigator.userActivation.hasBeenActive;
+
+  function positionner() {
+    if (!integre || !place) return;
+    const r = place.getBoundingClientRect();
+    Object.assign(panneau.style, { top: (r.top + window.scrollY) + 'px', left: (r.left + window.scrollX) + 'px', width: r.width + 'px', height: r.height + 'px' });
+  }
+
+  function majMode() {
+    const voulu = !!place && grandEcran.matches && placeVisible && !racine.hidden;
+    if (voulu === integre) { positionner(); return; }
+    integre = voulu;
+    racine.classList.toggle('ia-integre', integre);
+    if (integre) {
+      amarrer(false);
+      panneau.hidden = false;
+      racine.classList.remove('ia-appel');
+      racine.classList.add('ia-ouvert');
+      orbe.setAttribute('aria-expanded', 'true');
+      positionner();
+      sonder();
+      if (!salue) saluer({ parle: autorise() });
+    } else {
+      ['top', 'left', 'width', 'height'].forEach((k) => { panneau.style[k] = ''; });
+      racine.classList.remove('ia-ouvert');
+      orbe.setAttribute('aria-expanded', 'false');
+      panneau.hidden = true;
+    }
+  }
+
+  if (place && 'IntersectionObserver' in window) {
+    new IntersectionObserver((es) => { placeVisible = es[0].intersectionRatio > 0.3; majMode(); }, { threshold: [0, 0.3, 0.6, 1] }).observe(place);
+  }
+  if (place && 'ResizeObserver' in window) new ResizeObserver(positionner).observe(place);
+  window.addEventListener('resize', () => { majMode(); positionner(); });
+  if (grandEcran.addEventListener) grandEcran.addEventListener('change', majMode);
+
   // Sur grand écran, le contenu se décale pour que le panneau ne cache pas les indicateurs.
   function amarrer(oui) {
     document.body.classList.toggle('ia-amarre', oui);
@@ -467,7 +511,7 @@
 
   orbe.addEventListener('click', () => (racine.classList.contains('ia-ouvert') ? fermer() : ouvrir()));
   btnFermer.addEventListener('click', fermer);
-  panneau.addEventListener('keydown', (e) => { if (e.key === 'Escape') { e.preventDefault(); fermer(); } });
+  panneau.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !integre) { e.preventDefault(); fermer(); } });
   btnVoix.addEventListener('click', () => {
     voixActive = !voixActive;
     ecrire(CLE_VOIX, voixActive ? '1' : '0');
@@ -502,6 +546,7 @@
       jetonPret = deriver(mdp).then((h) => { jeton = h; return h; }).catch(() => null);
       racine.hidden = false;
       racine.classList.add('ia-appel');
+      requestAnimationFrame(majMode);
     },
     contexte: () => contexteTexte,
     pourLaVoix,

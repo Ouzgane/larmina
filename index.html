@@ -262,9 +262,14 @@ body.verrouille { overflow: hidden; height: 100vh; }
 
 
 /* ── Geri, au centre ──────────────────────────────────────────────────────── */
-.geri-hero { position: relative; display: grid; grid-template-columns: minmax(210px, 1fr) minmax(320px, 580px) minmax(210px, 1fr); gap: clamp(14px, 2.2vw, 30px); align-items: center; }
+.geri-hero { position: relative; display: grid; grid-template-columns: minmax(230px, 300px) minmax(320px, 1fr) minmax(330px, 410px); gap: clamp(14px, 2vw, 28px); align-items: center; }
 .geri-liens { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; overflow: visible; z-index: 2; }
-.geri-col { position: relative; z-index: 1; display: flex; flex-direction: column; gap: 14px; }
+.geri-col { position: relative; z-index: 1; display: flex; flex-direction: column; gap: 12px; }
+.geri-col .hud-pod { padding: 12px 16px 13px; }
+.geri-col .hud-pod-val { font-size: clamp(22px, 2.1vw, 28px); margin: 5px 0 3px; }
+.geri-col .hud-pod-val.hud-pod-txt { font-size: clamp(18px, 1.7vw, 22px); }
+.geri-col .hud-pod-sub { font-size: 12px; }
+.geri-chat-place { align-self: stretch; min-height: 540px; }
 .geri-centre { position: relative; display: flex; flex-direction: column; align-items: center; gap: 4px; min-width: 0; }
 .geri-scene { appearance: none; position: relative; display: block; width: 100%; max-width: 580px; aspect-ratio: 1; padding: 0; margin: 0; border: 0; border-radius: 50%; background: transparent; cursor: pointer; }
 .geri-scene canvas { display: block; width: 100%; height: 100%; }
@@ -287,16 +292,22 @@ body.verrouille { overflow: hidden; height: 100vh; }
 .geri-lien circle { fill: #eafcff; filter: drop-shadow(0 0 6px #4de3ff); }
 .pp { transition: padding-right .32s cubic-bezier(.2,.8,.2,1); }
 @media (min-width: 1200px) { body.ia-amarre .pp { padding-right: 462px; } }
-@media (max-width: 1100px) {
-  .geri-hero { grid-template-columns: 1fr 1fr; }
-  .geri-centre { grid-column: 1 / -1; order: -1; }
-  .geri-scene { max-width: 460px; }
+@media (max-width: 1179px) {
+  .geri-hero { grid-template-columns: minmax(230px, 320px) 1fr; }
+  .geri-chat-place { display: none; }
+  .geri-scene { max-width: 500px; }
+}
+@media (max-width: 760px) {
+  .geri-hero { grid-template-columns: 1fr; }
+  .geri-centre { order: -1; }
+  .geri-col { display: grid; grid-template-columns: 1fr 1fr; }
+  .geri-col .hud-pod:first-child { grid-column: 1 / -1; }
 }
 @media (max-width: 560px) {
   .geri-hero { gap: 10px; }
+  .geri-col .hud-pod:not(:first-child) .hud-pod-sub { display: none; }
   .geri-col { gap: 10px; }
   .geri-scene { max-width: 340px; }
-  .geri-hero .hud-pod-sub { display: none; }
 }
 @media (prefers-reduced-motion: no-preference) {
   .hud-pod.geri-presente::before { animation: geri-coin .6s ease-out; }
@@ -312,6 +323,9 @@ body.verrouille { overflow: hidden; height: 100vh; }
 @keyframes geri-flux { to { stroke-dashoffset: -24; } }
 @keyframes geri-impact { 0% { transform: scale(.6); opacity: 1; } 100% { transform: scale(2.2); opacity: 0; } }
 @keyframes geri-apparait { 0% { opacity: 0; } 12% { opacity: 1; } 75% { opacity: 1; } 100% { opacity: 0; } }
+
+#ia.ia-integre .ia-panneau { position: absolute; right: auto; bottom: auto; z-index: 5; opacity: 1; transform: none; transition: opacity .25s ease; }
+#ia.ia-integre .ia-orbe, #ia.ia-integre #ia-fermer { display: none; }
 
 /* ── Assistant ─────────────────────────────────────────────────────────────── */
 #ia { --ia-c: #4de3ff; --ia-c2: #9befff; --ia-t: #dcf6ff; --ia-m: #84a7bd; --ia-l: rgba(77,227,255,.2); --ia-ok: #3dffb0; --ia-ko: #ff4f6e; --ia-v: #b48cff;
@@ -460,7 +474,7 @@ body.verrouille { overflow: hidden; height: 100vh; }
 <div class="pp" lang="fr">
   <header id="entete">
     <div class="hud-status"><i class="hud-pulse"></i>Système de pilotage · en ligne<span class="hud-sep">//</span>Rapport du <b data-draw="date-rapport" class="dash-skeleton" data-source="syntheses" data-field="date" data-row="0">—</b><span class="hud-sep">//</span>Publié le <b id="publie-le">—</b><button id="verrouiller" class="hud-lock" type="button">Verrouiller</button></div>
-    <h1 class="hud-title">Pilotage des projets</h1>
+    <h1 class="ia-masque">Pilotage des projets</h1>
     <p class="hud-lede">
       <span data-lede="zero">Aucun projet ne génère encore de revenu.</span>
       <span data-lede="some" hidden>Projets qui génèrent du revenu : <b data-draw="lede-nbrev" data-source="kpi" data-field="nb_avec_revenu" data-row="0">—</b>, pour <b data-draw="lede-total" data-source="kpi" data-field="total" data-row="0">—</b> encaissés au total.</span>
@@ -468,37 +482,15 @@ body.verrouille { overflow: hidden; height: 100vh; }
     </p>
   </header>
 
-  <section class="geri-hero" id="indicateurs" aria-label="Geri et les indicateurs du portefeuille">
+  <section class="geri-hero" id="indicateurs" aria-label="Geri, les indicateurs et la conversation">
     <svg class="geri-liens" id="geri-liens" aria-hidden="true"></svg>
-    <div class="geri-col geri-col-g">
+    <div class="geri-col">
       <div class="hud-panel hud-pod" id="kpi-total">
-        <div class="hud-pod-label">Revenu cumulé</div>
+        <div class="hud-pod-label">Revenu encaissé</div>
         <div class="hud-pod-val dash-skeleton" data-draw="k-total" data-source="kpi" data-field="total" data-row="0">—</div>
-        <div class="hud-pod-sub">Projets qui rapportent : <b><span data-draw="k-nbrev" class="dash-skeleton" data-source="kpi" data-field="nb_avec_revenu" data-row="0">—</span> / <span data-draw="k-nb" class="dash-skeleton" data-source="kpi" data-field="nb_projets" data-row="0">—</span></b></div>
+        <div class="hud-pod-sub">30 derniers jours : <b data-draw="k-30j" class="dash-skeleton" data-source="kpi" data-field="total_30j" data-row="0">—</b> · Projets qui rapportent : <b><span data-draw="k-nbrev" class="dash-skeleton" data-source="kpi" data-field="nb_avec_revenu" data-row="0">—</span> / <span data-draw="k-nb" class="dash-skeleton" data-source="kpi" data-field="nb_projets" data-row="0">—</span></b></div>
         <i class="hud-pod-bar"></i>
       </div>
-      <div class="hud-panel hud-pod" id="kpi-30j">
-        <div class="hud-pod-label">Revenu · 30 derniers jours</div>
-        <div class="hud-pod-val dash-skeleton" data-draw="k-30j" data-source="kpi" data-field="total_30j" data-row="0">—</div>
-        <div class="hud-pod-sub"><span data-draw="k-30j-delta">—</span></div>
-        <i class="hud-pod-bar"></i>
-      </div>
-      <div class="hud-panel hud-pod" id="kpi-automatisations">
-        <div class="hud-pod-label">Automatisations actives</div>
-        <div class="hud-pod-val dash-skeleton" data-draw="k-auto" data-source="kpi" data-field="nb_automatisations" data-row="0">—</div>
-        <div class="hud-pod-sub">Tâches planifiées qui travaillent sur tes projets</div>
-        <i class="hud-pod-bar"></i>
-      </div>
-    </div>
-    <div class="geri-centre">
-      <button class="geri-scene" id="geri-scene" type="button"><canvas aria-hidden="true"></canvas></button>
-      <div class="geri-plaque">
-        <b class="geri-nom" id="geri-nom">GERI</b>
-        <span class="geri-etat" id="geri-etat" role="status">En veille</span>
-        <span class="geri-sujet" id="geri-sujet" aria-hidden="true"></span>
-      </div>
-    </div>
-    <div class="geri-col geri-col-d">
       <div class="hud-panel hud-pod" id="kpi-proche">
         <div class="hud-pod-label">Le plus proche du premier euro</div>
         <div class="hud-pod-val hud-pod-txt dash-skeleton" data-draw="lede-proche" data-source="kpi" data-field="proche_projet" data-row="0">—</div>
@@ -514,10 +506,25 @@ body.verrouille { overflow: hidden; height: 100vh; }
       <div class="hud-panel hud-pod" id="kpi-avancement">
         <div class="hud-pod-label">Avancement moyen</div>
         <div class="hud-pod-val dash-skeleton" data-draw="k-avmoy" data-source="kpi" data-field="avancement_moyen" data-row="0">—</div>
-        <div class="hud-pod-sub">Vers le premier revenu récurrent, tous projets confondus</div>
+        <div class="hud-pod-sub">Vers le premier revenu récurrent</div>
+        <i class="hud-pod-bar"></i>
+      </div>
+      <div class="hud-panel hud-pod" id="kpi-automatisations">
+        <div class="hud-pod-label">Automatisations actives</div>
+        <div class="hud-pod-val dash-skeleton" data-draw="k-auto" data-source="kpi" data-field="nb_automatisations" data-row="0">—</div>
+        <div class="hud-pod-sub">Tâches planifiées sur tes projets</div>
         <i class="hud-pod-bar"></i>
       </div>
     </div>
+    <div class="geri-centre">
+      <button class="geri-scene" id="geri-scene" type="button"><canvas aria-hidden="true"></canvas></button>
+      <div class="geri-plaque">
+        <b class="geri-nom" id="geri-nom">GERI</b>
+        <span class="geri-etat" id="geri-etat" role="status">En veille</span>
+        <span class="geri-sujet" id="geri-sujet" aria-hidden="true"></span>
+      </div>
+    </div>
+    <div class="geri-chat-place" id="geri-chat"></div>
   </section>
 
   <section class="hud-panel hud-brief" id="synthese">
@@ -636,11 +643,11 @@ body.verrouille { overflow: hidden; height: 100vh; }
   </section>
 </div>
 <script src="vendor/d3.min.js"></script>
-<script src="dash-shim.js?v=20261110a"></script>
-<script src="app.js?v=20261110a"></script>
-<script src="config.js?v=20261110a"></script>
-<script src="geri.js?v=20261110a"></script>
-<script src="assistant.js?v=20261110a"></script>
-<script src="acces.js?v=20261110a"></script>
+<script src="dash-shim.js?v=20261110b"></script>
+<script src="app.js?v=20261110b"></script>
+<script src="config.js?v=20261110b"></script>
+<script src="geri.js?v=20261110b"></script>
+<script src="assistant.js?v=20261110b"></script>
+<script src="acces.js?v=20261110b"></script>
 </body>
 </html>

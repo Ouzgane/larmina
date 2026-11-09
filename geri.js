@@ -210,7 +210,7 @@
   // ── Présentation des indicateurs ─────────────────────────────────────────────
   const CIBLES = [
     { id: 'kpi-total', motif: /revenus?|encaiss|chiffre d.affaires|\d[\d\s  .,]*(k\s?)?(€|euros?\b)|mille euros/gi },
-    { id: 'kpi-30j', motif: /30 (derniers )?jours|ce mois|mensuel/gi },
+    { id: 'kpi-total', motif: /30 (derniers )?jours|ce mois|mensuel/gi },
     { id: 'kpi-decisions', motif: /d[ée]cision|arbitr|trancher|d[ée]cider/gi },
     { id: 'kpi-avancement', motif: /avancement|progress|\d+\s?%|pour ?cent/gi },
     { id: 'kpi-automatisations', motif: /automatis|t[âa]ches? planifi/gi },
