@@ -139,47 +139,67 @@
     return sortie.map((s) => s.trim()).filter(Boolean);
   }
 
+  // Chrome perd les événements des énoncés non référencés et ignore parfois un speak()
+  // lancé juste après cancel() : on garde les énoncés en mémoire et on laisse un court délai.
+  let generation = 0;
+  const enLecture = [];
+
   function taire() {
+    generation++;
     clearTimeout(veille);
     if (synth) { try { synth.cancel(); } catch (e) { /* rien */ } }
     racine.classList.remove('ia-parle');
   }
 
-  // Certains navigateurs (dont le navigateur intégré de l'app Claude) acceptent la demande
-  // mais ne parlent jamais : sans début de lecture après quelques secondes, on prévient.
-  function parler(texte) {
-    if (!synth || !voixActive) return;
-    taire();
-    const morceaux = decouper(pourLaVoix(texte));
-    if (!morceaux.length) return;
-    let demarre = false;
-    morceaux.forEach((m, i) => {
-      const u = new SpeechSynthesisUtterance(m);
-      u.lang = voixChoisie ? voixChoisie.lang : 'fr-FR';
-      if (voixChoisie) u.voice = voixChoisie;
-      u.rate = 1.03;
-      u.pitch = 1;
-      if (i === 0) u.onstart = () => { demarre = true; clearTimeout(veille); racine.classList.add('ia-parle'); };
-      if (i === morceaux.length - 1) u.onend = u.onerror = () => racine.classList.remove('ia-parle');
-      synth.speak(u);
-    });
-    clearTimeout(veille);
-    veille = setTimeout(() => {
-      if (demarre) return;
-      taire();
-      if (panneSignalee) return;
-      panneSignalee = true;
-      const { corps } = bulle('ia-msg-ia ia-msg-info', 'Voix');
-      corps.textContent = 'Ce navigateur ne lit pas la synthèse vocale. Ouvre le site dans Chrome, Safari ou Edge pour m\u2019entendre ; le texte reste disponible ici.';
-      defiler();
-    }, 3500);
+  function signaler(texte) {
+    if (panneSignalee) return;
+    panneSignalee = true;
+    const { corps } = bulle('ia-msg-ia ia-msg-info', 'Voix');
+    corps.textContent = texte;
+    defiler();
   }
 
-  // Safari et iOS n'autorisent la voix qu'après un geste : on la « réveille » au premier clic.
+  function parler(texte) {
+    if (!synth || !voixActive) return;
+    const morceaux = decouper(pourLaVoix(texte));
+    if (!morceaux.length) return;
+    const occupe = synth.speaking || synth.pending;
+    taire();
+    const g = generation;
+    const lancer = () => {
+      if (g !== generation) return;
+      try { if (synth.paused) synth.resume(); } catch (e) { /* rien */ }
+      let demarre = false;
+      enLecture.length = 0;
+      morceaux.forEach((m, i) => {
+        const u = new SpeechSynthesisUtterance(m);
+        u.lang = voixChoisie ? voixChoisie.lang : 'fr-FR';
+        if (voixChoisie) u.voice = voixChoisie;
+        u.rate = 1.03;
+        u.pitch = 1;
+        u.onstart = () => { demarre = true; clearTimeout(veille); racine.classList.add('ia-parle'); };
+        u.onerror = (e) => {
+          console.warn('[' + NOM + '] voix :', e && e.error);
+          if (e && e.error === 'not-allowed') signaler('Le navigateur bloque la voix pour l\u2019instant. Clique sur le haut-parleur en haut du panneau pour l\u2019autoriser.');
+          if (i === morceaux.length - 1) racine.classList.remove('ia-parle');
+        };
+        if (i === morceaux.length - 1) u.onend = () => racine.classList.remove('ia-parle');
+        enLecture.push(u);
+        synth.speak(u);
+      });
+      clearTimeout(veille);
+      veille = setTimeout(() => {
+        if (demarre || g !== generation) return;
+        signaler('La voix ne démarre pas dans ce navigateur. Vérifie que le son de l\u2019onglet et de l\u2019ordinateur est activé, puis clique sur le haut-parleur pour un essai. Le navigateur intégré de l\u2019app Claude ne lit pas la voix.');
+      }, 5000);
+    };
+    if (occupe) setTimeout(lancer, 200); else lancer();
+  }
+
   function debloquerVoix() {
     if (!synth || !voixActive || voixDebloquee) return;
     voixDebloquee = true;
-    try { synth.cancel(); if (synth.resume) synth.resume(); const u = new SpeechSynthesisUtterance(''); u.volume = 0; synth.speak(u); } catch (e) { /* rien */ }
+    try { if (synth.paused) synth.resume(); } catch (e) { /* rien */ }
   }
 
   function majVoix() {
