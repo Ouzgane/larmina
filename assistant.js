@@ -76,9 +76,9 @@
     projets.forEach((x) => {
       const siens = rapports.filter((r) => r.projet_id === x.id);
       const dernier = siens[siens.length - 1];
-      L.push(`■ ${x.projet}${x.nom_court && x.nom_court !== x.projet ? ' (' + x.nom_court + ')' : ''}`);
+      L.push(`■ ${x.projet}${x.nom_court && x.nom_court !== x.projet ? ' (' + x.nom_court + ')' : ''} [id: ${x.id}]`);
       [
-        ['Pôle', x.pole], ['Recommandation du rapport', x.recommandation], ['Décision de l’utilisateur', x.decision],
+        ['Pôle', x.pole], ['Recommandation du rapport', x.recommandation], ['Décision de l’utilisateur', x.decision], ['Statut', x.statut],
         ['Étape', x.etape], ['Avancement', x.avancement != null ? x.avancement + ' %' : null], ['Dynamique', x.dynamique],
         ['Potentiel à 12 mois', x.potentiel != null ? x.potentiel + '/5' : null], ['Effort restant', x.effort != null ? x.effort + '/5' : null],
         ['Objectif mensuel', x.objectif_mensuel != null ? eur(x.objectif_mensuel) : 'non fixé'], ['Revenu encaissé', eur(parProjet[x.id] || 0)],
@@ -150,6 +150,7 @@
     generation++;
     clearTimeout(veille);
     if (synth) { try { synth.cancel(); } catch (e) { /* rien */ } }
+    if (window.GERI_VOIX) window.GERI_VOIX.arreter();
     racine.classList.remove('ia-parle');
     emettre('etat', { etat: 'veille' });
   }
@@ -163,8 +164,41 @@
   }
 
   function parler(texte) {
-    if (!synth || !voixActive) { emettre('texte', { texte: pourLaVoix(texte) }); return; }
-    const morceaux = decouper(pourLaVoix(texte));
+    const lu = pourLaVoix(texte);
+    if (!voixActive) { emettre('texte', { texte: lu }); return; }
+    const V = window.GERI_VOIX;
+    if (V && V.possible()) {
+      if (V.etat() !== 'pret') {
+        // Voix encore en téléchargement : sous-titres seuls pour cette réponse.
+        V.prechauffer();
+        emettre('texte', { texte: lu });
+        return;
+      }
+      const morceaux = decouper(lu);
+      if (!morceaux.length) return;
+      taire();
+      const g = generation;
+      emettre('etat', { etat: 'parle' });
+      racine.classList.add('ia-parle');
+      V.dire(morceaux, {
+        segment: (m, duree) => { if (g === generation) emettre('segment', { texte: m, duree }); },
+        fin: () => { if (g !== generation) return; racine.classList.remove('ia-parle'); emettre('etat', { etat: 'veille' }); },
+        echec: (raison) => {
+          if (g !== generation) return;
+          racine.classList.remove('ia-parle');
+          if (raison === 'bloque' || raison === 'lent') emettre('texte', { texte: lu });
+          else parlerSysteme(lu);
+        },
+      });
+      return;
+    }
+    parlerSysteme(lu);
+  }
+
+  // Dernier recours : la synthèse vocale du système (qualité et disponibilité variables).
+  function parlerSysteme(lu) {
+    if (!synth) { emettre('texte', { texte: lu }); return; }
+    const morceaux = decouper(lu);
     if (!morceaux.length) return;
     const occupe = synth.speaking || synth.pending;
     taire();
@@ -356,6 +390,12 @@
     taire();
     puces([]);
     if (!rejouer) ajouterUtilisateur(question);
+    const lien = question.match(/https?:\/\/open\.spotify\.com\/\S+|spotify:[a-z]+:[A-Za-z0-9]{22}/);
+    if (lien && window.GERI_MUSIQUE && window.GERI_MUSIQUE.reconnait(lien[0])) {
+      window.GERI_MUSIQUE.jouer(lien[0]);
+      ajouterAssistant('Je lance ça.');
+      return;
+    }
     historique.push({ role: 'user', content: question });
     if (!RELAIS) {
       historique.pop();
@@ -371,7 +411,7 @@
       await jetonPret;
       if (!jeton) throw Object.assign(new Error('Impossible de préparer l’accès sécurisé dans ce navigateur.'), { connue: true });
       const options = { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + jeton },
-        body: JSON.stringify({ messages: historique.slice(-HISTORIQUE), contexte: contexteTexte, nom: NOM }) };
+        body: JSON.stringify({ messages: historique.slice(-HISTORIQUE), contexte: contexteTexte, nom: NOM, playlists: window.GERI_MUSIQUE ? window.GERI_MUSIQUE.playlists() : [] }) };
       if (window.AbortSignal && AbortSignal.timeout) options.signal = AbortSignal.timeout(60000);
       rep = await fetch(RELAIS + '/discuter', options);
       try { corps = await rep.json(); } catch (e) { corps = null; }
@@ -381,6 +421,10 @@
       historique.push({ role: 'assistant', content: texte });
       historique = historique.slice(-HISTORIQUE * 2);
       ajouterAssistant(texte);
+      if (corps && corps.musique && window.GERI_MUSIQUE) {
+        if (corps.musique === 'stop') window.GERI_MUSIQUE.arreter(); else window.GERI_MUSIQUE.jouer(corps.musique);
+      }
+      ((corps && corps.actions) || []).forEach(proposerNotion);
       puces((corps && corps.suggestions) || []);
       if (corps && corps.modele) modele.textContent = libelleModele(corps.fournisseur, corps.modele);
       statut('En ligne', 'ia-etat-ok');
@@ -396,6 +440,80 @@
       enCours = false;
       envoyer.disabled = false;
     }
+  }
+
+  // ── Mises à jour Notion proposées par Geri, écrites seulement après confirmation ──
+  const LIBELLES = { decision: 'Décision', statut: 'Statut', prochaine_etape: 'Prochaine étape', echeance: 'Échéance', blocages: 'Blocages', resume: 'Résumé' };
+  function valeurLisible(cle, v) {
+    if (cle === 'echeance' && /^\d{4}-\d{2}-\d{2}$/.test(v)) { const [a, m, j] = v.split('-'); return `${+j} ${MOIS[+m - 1]} ${a}`; }
+    return v;
+  }
+  function proposerNotion(action) {
+    const projets = (donnees && donnees.projets) || [];
+    const p = projets.find((x) => x.id === action.projet);
+    if (!p || !action.champs) return;
+    const { li, corps } = bulle('ia-msg-ia ia-msg-action', 'Notion');
+    const t = document.createElement('b');
+    t.textContent = p.projet;
+    const ul = document.createElement('ul');
+    Object.entries(action.champs).forEach(([cle, v]) => {
+      const it = document.createElement('li');
+      const l = document.createElement('span');
+      l.className = 'ia-action-cle';
+      l.textContent = (LIBELLES[cle] || cle) + ' → ';
+      it.append(l, document.createTextNode(valeurLisible(cle, v)));
+      ul.appendChild(it);
+    });
+    const boutons = document.createElement('div');
+    boutons.className = 'ia-action-boutons';
+    const ok = document.createElement('button');
+    ok.type = 'button'; ok.className = 'ia-action-ok'; ok.textContent = 'Enregistrer dans Notion';
+    const non = document.createElement('button');
+    non.type = 'button'; non.className = 'ia-action-non'; non.textContent = 'Ignorer';
+    boutons.append(ok, non);
+    corps.append(t, ul, boutons);
+    defiler();
+    emettre('presente', { id: 'projet-' + p.id });
+    non.addEventListener('click', () => {
+      boutons.replaceChildren(document.createTextNode('Ignoré : rien n’a été écrit.'));
+      li.classList.add('ia-action-fini');
+    });
+    ok.addEventListener('click', async () => {
+      ok.disabled = non.disabled = true;
+      ok.textContent = 'Enregistrement…';
+      try {
+        await jetonPret;
+        const r = await fetch(RELAIS + '/notion', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + jeton },
+          body: JSON.stringify({ projet: p.id, projet_nom: p.projet, champs: action.champs }),
+        });
+        const j = await r.json().catch(() => ({}));
+        if (!r.ok) throw new Error(j.erreur || 'Erreur ' + r.status);
+        // Le tableau reflète tout de suite la décision ; le rapport du matin la reprendra depuis Notion.
+        Object.assign(p, action.champs);
+        contexteTexte = construireContexte(donnees);
+        if (window.PILOTAGE && window.PILOTAGE.charger) window.PILOTAGE.charger(donnees);
+        boutons.replaceChildren();
+        const fait = document.createElement('span');
+        fait.className = 'ia-action-ok-txt';
+        fait.textContent = '✓ Enregistré dans Notion';
+        boutons.appendChild(fait);
+        if (j.url && /^https:\/\/([a-z]+\.)?notion\.(so|com)\//.test(j.url)) {
+          const a = document.createElement('a');
+          a.href = j.url; a.target = '_blank'; a.rel = 'noopener'; a.textContent = 'Ouvrir la fiche';
+          boutons.appendChild(a);
+        }
+        li.classList.add('ia-action-fini');
+        emettre('presente', { id: 'projet-' + p.id });
+      } catch (e) {
+        ok.disabled = non.disabled = false;
+        ok.textContent = 'Réessayer';
+        let err = boutons.querySelector('.ia-action-err');
+        if (!err) { err = document.createElement('span'); err.className = 'ia-action-err'; boutons.appendChild(err); }
+        err.textContent = e.message === 'Failed to fetch' ? 'Relais injoignable.' : e.message;
+      }
+    });
   }
 
   // Vérifie que le relais répond et affiche le modèle actif (aucune donnée envoyée).
@@ -516,7 +634,14 @@
     voixActive = !voixActive;
     ecrire(CLE_VOIX, voixActive ? '1' : '0');
     majVoix();
-    if (voixActive) { debloquerVoix(); parler('Voix activée.'); } else taire();
+    if (voixActive) { debloquerVoix(); if (window.GERI_VOIX) window.GERI_VOIX.prechauffer(); parler('Voix activée.'); } else taire();
+  });
+  // Avancement du premier téléchargement de la voix, affiché dans l'état du chat.
+  document.addEventListener('voix:progres', (e) => { if (!enCours) statut('Voix : préparation ' + Math.round((e.detail.part || 0) * 100) + ' %', 'ia-etat-actif'); });
+  document.addEventListener('voix:etat', (e) => {
+    if (enCours) return;
+    if (e.detail.etat === 'pret') statut('En ligne · voix prête', 'ia-etat-ok');
+    else if (e.detail.etat === 'panne') statut('En ligne · voix du navigateur', 'ia-etat-ok');
   });
   form.addEventListener('submit', (e) => {
     e.preventDefault();
@@ -547,6 +672,7 @@
       racine.hidden = false;
       racine.classList.add('ia-appel');
       requestAnimationFrame(majMode);
+      if (voixActive && window.GERI_VOIX) setTimeout(() => window.GERI_VOIX.prechauffer(), 1200);
     },
     contexte: () => contexteTexte,
     pourLaVoix,

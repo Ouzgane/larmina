@@ -184,3 +184,62 @@ test('texteDe accepte toutes les formes connues', () => {
   assert.equal(texteDe({ output_text: 'ot' }), 'ot');
   assert.equal(texteDe({ choices: [{ message: { content: [{ type: 'text', text: 'parts' }] } }] }), 'parts');
 });
+
+import { analyser, validerNotion, consignes } from '../src/consignes.js';
+
+test('actions du modèle : musique et propositions Notion extraites et validées', () => {
+  const r = analyser('Je lance de quoi te concentrer et je note la pause de Tablée.\nMUSIQUE: Concentration\nNOTION: {"projet":"tablee","decision":"Mettre en pause","statut":"En pause","prochaine_etape":"Rien avant janvier","hack":"x"}\nNOTION: {"projet":"kitvital","decision":"Tout donner"}\nSUGGESTIONS: Et ensuite ? | Autre chose ?');
+  assert.equal(r.texte, 'Je lance de quoi te concentrer et je note la pause de Tablée.');
+  assert.equal(r.musique, 'concentration');
+  assert.deepEqual(r.actions, [{ projet: 'tablee', champs: { decision: 'Mettre en pause', statut: 'En pause', prochaine_etape: 'Rien avant janvier' } }]);
+  assert.deepEqual(r.suggestions, ['Et ensuite ?', 'Autre chose ?']);
+  assert.equal(validerNotion({ projet: '../x', decision: 'Accélérer' }), null);
+  assert.equal(validerNotion({ projet: 'kitvital', echeance: '20/11' }), null);
+});
+
+test('consignes : musique et Notion seulement quand ils sont disponibles', () => {
+  const sans = consignes({ nom: 'Geri', date: 'lundi', contexte: '' });
+  assert.doesNotMatch(sans, /MUSIQUE:|NOTION:/);
+  const avec = consignes({ nom: 'Geri', date: 'lundi', contexte: '', playlists: [{ cle: 'jazz', nom: 'Jazz' }], notion: true });
+  assert.match(avec, /« jazz » \(Jazz\)/);
+  assert.match(avec, /NOTION: \{"projet"/);
+});
+
+test('discuter : musique inconnue ignorée, actions Notion seulement si Notion est branché', async () => {
+  const sortie = 'Ok.\nMUSIQUE: inconnue\nNOTION: {"projet":"tablee","statut":"En pause"}';
+  const { env } = envDe({ reponseIA: () => ({ response: sortie }) });
+  const q = { ...question, playlists: [{ cle: 'jazz', nom: 'Jazz' }] };
+  let j = await (await relais.fetch(requete(q), env)).json();
+  assert.equal(j.musique, null);
+  assert.deepEqual(j.actions, []);
+  const { env: env2 } = envDe({ NOTION_CLE: 'secret_x', NOTION_SOURCE: 'source-1', reponseIA: () => ({ response: sortie.replace('inconnue', 'jazz') }) });
+  j = await (await relais.fetch(requete(q), env2)).json();
+  assert.equal(j.musique, 'jazz');
+  assert.deepEqual(j.actions, [{ projet: 'tablee', champs: { statut: 'En pause' } }]);
+});
+
+test('notion : la mise à jour confirmée est écrite sur la bonne page', async () => {
+  const { env } = envDe({ NOTION_CLE: 'secret_x', NOTION_SOURCE: 'source-1' });
+  const appels = [];
+  const avant = globalThis.fetch;
+  globalThis.fetch = async (url, init) => {
+    appels.push({ url, init, corps: init.body ? JSON.parse(init.body) : null });
+    if (url.endsWith('/data_sources/source-1/query')) return repJson({ results: [{ id: 'page-tablee', url: 'https://notion.so/page-tablee' }] });
+    if (url.endsWith('/pages/page-tablee')) return repJson({ id: 'page-tablee', url: 'https://notion.so/page-tablee' });
+    return repJson({}, 404);
+  };
+  try {
+    const r = await relais.fetch(requete({ projet: 'tablee', projet_nom: 'Tablée', champs: { decision: 'Mettre en pause', echeance: '2027-01-15', pirate: 'x' } }, { chemin: '/notion' }), env);
+    const j = await r.json();
+    assert.equal(r.status, 200, JSON.stringify(j));
+    assert.equal(j.url, 'https://notion.so/page-tablee');
+    assert.deepEqual(appels[0].corps.filter, { property: 'Projet', title: { equals: 'Tablée' } });
+    assert.equal(appels[0].init.headers.Authorization, 'Bearer secret_x');
+    assert.deepEqual(appels[1].corps.properties, { 'Décision': { select: { name: 'Mettre en pause' } }, 'Échéance': { date: { start: '2027-01-15' } } });
+    assert.equal(appels[1].init.method, 'PATCH');
+  } finally { globalThis.fetch = avant; }
+  assert.equal((await relais.fetch(requete({ projet: 'tablee', projet_nom: 'Tablée', champs: {} }, { chemin: '/notion' }), env)).status, 400);
+  assert.equal((await relais.fetch(requete({ projet: 'tablee', projet_nom: 'Tablée', champs: { decision: 'Accélérer' } }, { chemin: '/notion', jeton: 'c'.repeat(64) }), env)).status, 401);
+  const sans = envDe();
+  assert.equal((await relais.fetch(requete({ projet: 'tablee', projet_nom: 'Tablée', champs: { decision: 'Accélérer' } }, { chemin: '/notion' }), sans.env)).status, 501);
+});

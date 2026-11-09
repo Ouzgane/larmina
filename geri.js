@@ -62,9 +62,14 @@
     const t = reduit ? 0 : now / 1000;
     // Énergie : ce que la voix « dégage », pour faire vivre les ondes.
     let cible = 0.05;
+    const niv = typeof window.GERI_NIVEAU === 'function' ? window.GERI_NIVEAU() : null;
     if (etat === 'reflexion') cible = 0.2;
-    if (etat === 'parle') cible = 0.42 + 0.38 * (0.5 + 0.5 * Math.sin(t * 16.3)) * (0.5 + 0.5 * Math.sin(t * 5.1 + 1.3)) + impulsion;
-    energie += (cible - energie) * (reduit ? 1 : 0.14);
+    if (etat === 'parle') {
+      // Avec la voix intégrée, la sphère suit le vrai niveau sonore ; sinon un rythme de parole simulé.
+      cible = niv !== null ? 0.12 + Math.min(1.05, niv * 5.5) + impulsion * 0.5
+        : 0.42 + 0.38 * (0.5 + 0.5 * Math.sin(t * 16.3)) * (0.5 + 0.5 * Math.sin(t * 5.1 + 1.3)) + impulsion;
+    }
+    energie += (cible - energie) * (reduit ? 1 : niv !== null ? 0.38 : 0.14);
     impulsion *= 0.9;
     const e = Math.min(1.2, energie);
 
@@ -304,20 +309,58 @@
     setTimeout(() => g.remove(), 2600);
   }
 
+  // ── Sous-titres : ce que Geri dit, mot à mot, sous la sphère ──────────────────
+  const st = document.getElementById('geri-soustitre');
+  const stMinuteries = [];
+  function soustitrer(texte, duree) {
+    if (!st || !texte) return;
+    stMinuteries.splice(0).forEach(clearTimeout);
+    clearTimeout(st._fin);
+    st.replaceChildren();
+    const mots = String(texte).split(/\s+/).filter(Boolean);
+    const spans = mots.map((m) => { const s = document.createElement('span'); s.textContent = m + ' '; st.appendChild(s); return s; });
+    st.classList.add('geri-st-on');
+    if (reduit) spans.forEach((s) => s.classList.add('dit'));
+    else {
+      const pas = (duree * 0.92) / Math.max(1, mots.length);
+      spans.forEach((s, i) => stMinuteries.push(setTimeout(() => s.classList.add('dit'), i * pas)));
+    }
+    st._fin = setTimeout(() => st.classList.remove('geri-st-on'), duree + 2200);
+  }
+  const phrasesDe = (t) => {
+    const p = String(t).match(/[^.!?…]+[.!?…]*\s*/g) || [String(t)];
+    const out = [];
+    p.forEach((x) => { const d = out[out.length - 1]; if (d && (d + x).length < 120) out[out.length - 1] = d + x; else out.push(x); });
+    return out.map((x) => x.trim()).filter(Boolean);
+  };
+  // Sans voix : les sous-titres défilent au rythme d'une lecture à voix haute.
+  function soustitrerTout(texte) {
+    let t0 = 0;
+    phrasesDe(texte).forEach((p) => {
+      const d = Math.max(1400, p.length * 55);
+      stMinuteries.push(setTimeout(() => soustitrer(p, d), t0));
+      t0 += d;
+    });
+    return t0;
+  }
+
   // ── Événements envoyés par l'assistante ──────────────────────────────────────
   document.addEventListener('geri:etat', (e) => {
-    if (e.detail && e.detail.etat !== 'parle') { arreterPresentations(); simulationFin = 0; }
+    if (e.detail && e.detail.etat !== 'parle') { arreterPresentations(); simulationFin = 0; if (e.detail.etat === 'reflexion') stMinuteries.splice(0).forEach(clearTimeout); }
     changerEtat(e.detail && e.detail.etat);
     planifier();
   });
   document.addEventListener('geri:mot', () => { impulsion = Math.min(0.55, impulsion + 0.18); });
+  // Présentation explicite d'un élément (ex. le projet concerné par une mise à jour Notion).
+  document.addEventListener('geri:presente', (e) => { if (e.detail && e.detail.id) presenter({ id: e.detail.id }); });
   // Un morceau de phrase commence à être lu : on présente ce qu'il évoque au fil de la lecture.
-  document.addEventListener('geri:segment', (e) => { if (e.detail) programmer(e.detail.texte, e.detail.duree); });
+  document.addEventListener('geri:segment', (e) => { if (e.detail) { programmer(e.detail.texte, e.detail.duree); soustitrer(e.detail.texte, e.detail.duree); } });
   // Réponse affichée sans voix : la sphère « parle » le temps de la lecture et présente quand même.
   document.addEventListener('geri:texte', (e) => {
     if (!e.detail || !e.detail.texte) return;
     arreterPresentations();
-    const duree = Math.min(14000, Math.max(1800, e.detail.texte.length * 55));
+    stMinuteries.splice(0).forEach(clearTimeout);
+    const duree = Math.max(1800, soustitrerTout(e.detail.texte));
     changerEtat('parle');
     simulationFin = performance.now() + duree;
     programmer(e.detail.texte, duree);

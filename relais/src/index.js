@@ -3,7 +3,8 @@
 // GET  /          état du relais (fournisseur et modèle actifs), sans aucune donnée.
 
 import { appeler, decrireFournisseur, ErreurConfig, ErreurQuota } from './fournisseurs.js';
-import { consignes, extraireSuggestions } from './consignes.js';
+import { consignes, analyser, validerNotion } from './consignes.js';
+import { ecrireNotion, ErreurNotion } from './notion.js';
 
 const LIMITES = { corps: 96000, historique: 14, message: 2000, contexte: 30000 };
 
@@ -21,10 +22,14 @@ export default {
     if (request.method === 'GET' && url.pathname === '/') {
       try {
         const cfg = decrireFournisseur(env);
-        return json({ service: 'Relais IA du pilotage', fournisseur: cfg.nom, modele: cfg.modele, pret: true }, 200, cors);
+        return json({ service: 'Relais IA du pilotage', fournisseur: cfg.nom, modele: cfg.modele, notion: !!(env.NOTION_CLE && env.NOTION_SOURCE), pret: true }, 200, cors);
       } catch (e) {
         return json({ service: 'Relais IA du pilotage', pret: false, erreur: e.message }, 200, cors);
       }
+    }
+    if (url.pathname === '/notion' && request.method === 'POST') {
+      if (!(await jetonValide(request, env))) return json({ erreur: 'Accès refusé.' }, 401, cors);
+      return enregistrerNotion(request, env, cors);
     }
     if (url.pathname !== '/discuter') return json({ erreur: 'Adresse inconnue.' }, 404, cors);
     if (request.method !== 'POST') return json({ erreur: 'Méthode non autorisée.' }, 405, cors);
@@ -52,9 +57,19 @@ export default {
     try {
       cfg = decrireFournisseur(env);
       const maxTokens = Math.min(Math.max(parseInt(env.MAX_TOKENS, 10) || 1200, 200), 4000);
-      const brut = await appeler(cfg, { systeme: consignes({ nom, date, contexte }), messages, maxTokens }, env);
-      const { texte, suggestions } = extraireSuggestions(brut);
-      return json({ reponse: texte || 'Je n’ai pas de réponse nette à cela. Peux-tu reformuler ?', suggestions, fournisseur: cfg.nom, modele: cfg.modele }, 200, cors);
+      const playlists = Array.isArray(corps.playlists) ? corps.playlists.slice(0, 20).filter((p) => p && /^[a-z0-9-]{1,30}$/.test(p.cle)).map((p) => ({ cle: p.cle, nom: String(p.nom || p.cle).slice(0, 40) })) : [];
+      const notion = !!(env.NOTION_CLE && env.NOTION_SOURCE);
+      const brut = await appeler(cfg, { systeme: consignes({ nom, date, contexte, playlists, notion }), messages, maxTokens }, env);
+      const { texte, suggestions, musique, actions } = analyser(brut);
+      const cles = new Set(playlists.map((p) => p.cle));
+      return json({
+        reponse: texte || 'C’est noté.',
+        suggestions,
+        musique: musique && (musique === 'stop' || cles.has(musique)) ? musique : null,
+        actions: notion ? actions : [],
+        fournisseur: cfg.nom,
+        modele: cfg.modele,
+      }, 200, cors);
     } catch (e) {
       console.error('relais', cfg && cfg.nom, e && (e.stack || e.message || e));
       if (e instanceof ErreurQuota) return json({ erreur: e.message, code: 'quota' }, 429, cors);
@@ -63,6 +78,24 @@ export default {
     }
   },
 };
+
+// Enregistre dans Notion une mise à jour confirmée par l'utilisateur.
+async function enregistrerNotion(request, env, cors) {
+  if (!env.NOTION_CLE || !env.NOTION_SOURCE) return json({ erreur: 'Notion n’est pas encore branché : ajoute le secret NOTION_CLE.' }, 501, cors);
+  let corps;
+  try { corps = JSON.parse((await request.text()).slice(0, 20000)); } catch (e) { return json({ erreur: 'Requête illisible.' }, 400, cors); }
+  const action = validerNotion({ projet: corps && corps.projet, ...((corps && corps.champs) || {}) });
+  const nomProjet = typeof corps.projet_nom === 'string' ? corps.projet_nom.trim().slice(0, 200) : '';
+  if (!action || !nomProjet) return json({ erreur: 'Mise à jour incomplète.' }, 400, cors);
+  try {
+    const page = await ecrireNotion(env, nomProjet, action.champs);
+    return json({ ok: true, url: page.url, champs: action.champs }, 200, cors);
+  } catch (e) {
+    console.error('notion', e && (e.stack || e.message || e));
+    if (e instanceof ErreurNotion) return json({ erreur: e.message }, e.statut || 502, cors);
+    return json({ erreur: 'Notion n’a pas répondu. Réessaie dans un instant.' }, 502, cors);
+  }
+}
 
 // Garde les rôles utiles, fusionne les tours consécutifs du même rôle, commence par une question.
 export function normaliser(liste) {

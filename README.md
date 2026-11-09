@@ -33,6 +33,22 @@ navigateur ──(question + résumé des données)──▶ relais Cloudflare �
 - **Accès** : le navigateur dérive un jeton du mot de passe (PBKDF2, 310 000 itérations) ; le relais n'en connaît que l'empreinte (`JETON_EMPREINTE`). Sans le mot de passe, le relais refuse tout. Il n'accepte aussi que les appels venant de `ouzgane.github.io`.
 - **Données** : à chaque question, le navigateur envoie un résumé des données déchiffrées (environ 11 000 caractères). Le relais ne stocke rien.
 
+### Voix, sous-titres et sphère
+
+- La voix est **Piper « Siwis »**, une voix féminine française générée directement dans le navigateur, sans compte ni coût. Au premier usage, le navigateur télécharge environ 90 Mo (voix 63 Mo, moteur et prononciation), puis les garde en cache. Si elle ne peut pas se charger, Geri utilise la voix du système. Réglages dans `config.js` : `voixPiper` (`fr_FR-siwis-low`, plus légère) et `voixVitesse`.
+- Ce que Geri dit s'affiche aussi **sous la sphère, mot à mot**, comme des sous-titres, même voix coupée. Le texte reste dans le chat.
+- La sphère suit le **vrai niveau sonore** de la voix ; les indicateurs évoqués s'allument au fil de la phrase.
+
+### Musique (Spotify)
+
+Demande « mets du jazz », « de quoi me concentrer » ou colle un lien Spotify : le lecteur Spotify s'ouvre sous la sphère. Morceaux complets si tu es connecté à Spotify dans ce navigateur, extraits de 30 secondes sinon. La musique se met en pause quand Geri parle. Les playlists proposées se règlent dans `config.js` (`playlists`).
+
+### Notion
+
+Quand tu annonces une décision ou un changement (« je mets Tablée en pause jusqu'en janvier »), Geri propose une carte **« Enregistrer dans Notion »** : rien n'est écrit sans ton clic. Champs modifiables : Décision, Statut, Prochaine étape, Échéance, Blocages, Résumé, dans la base **Projets** de la page « Pilotage des projets ». Le tableau se met à jour aussitôt ; le rapport du matin reprend ces valeurs depuis Notion.
+
+Mise en service : créer une intégration Notion interne (notion.so/profile/integrations, droits « lire » et « modifier le contenu »), la connecter à la page « Pilotage des projets » (menu ••• → Connexions), mettre son secret dans le secret GitHub `NOTION_CLE`, puis relancer le workflow « Relais IA ».
+
 ### Modèle actuel
 
 Cloudflare Workers AI, modèle `@cf/openai/gpt-oss-120b`. Gratuit dans la limite de 10 000 neurones par jour, soit environ 50 à 60 questions par jour avec ce modèle. Au-delà, l'assistant l'annonce et reprend le lendemain (0 h UTC) : aucun frais possible sur le plan gratuit. Cloudflare n'utilise pas les requêtes pour entraîner des modèles.
@@ -81,9 +97,11 @@ Si le mot de passe du site change : `PILOTAGE_MDP='…' node outils/empreinte-ia
 - `dash-shim.js` : fournit les données déchiffrées à `app.js`.
 - `acces.js` : téléchargement, déchiffrement et mémorisation du mot de passe.
 - `geri.js` : la sphère de Geri au centre de la page, ses ondes quand elle parle, et la mise en lumière des indicateurs qu'elle évoque.
-- `assistant.js` : le chat, la voix, les relances et le résumé des données envoyé au relais.
+- `assistant.js` : le chat, les relances, les cartes Notion et le résumé des données envoyé au relais.
+- `voix.js`, `voix-worker.js` : la voix Piper (synthèse hors de la page, lecture et niveau sonore).
+- `musique.js` : le lecteur Spotify.
 - `config.js` : adresse du relais, nom de l'assistante, sa prononciation et sa voix.
 - `relais/` : le relais IA (Cloudflare Worker) et ses tests.
 - `.github/workflows/relais.yml` : déploiement automatique du relais.
-- `vendor/d3.min.js` : D3 v7.9 (licence ISC).
+- `vendor/` : D3, onnxruntime-web et piper-phonemize (voir `vendor/LICENCES.md`).
 - `outils/` : publication et vérification du fichier chiffré, empreinte de l'assistant (Node 20 ou plus, sans dépendance).

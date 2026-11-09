@@ -24,6 +24,10 @@ IA_URL = ""
 # Plafond de jetons générés par réponse.
 MAX_TOKENS = "1200"
 
+# Notion : base « Projets » où Geri enregistre les décisions confirmées.
+# La clé de l'intégration Notion est le secret GitHub NOTION_CLE (jamais ici).
+NOTION_SOURCE = "de823e47-5a0f-41b8-8d1e-513008d7cfca"
+
 # Sites autorisés à appeler le relais (séparés par des virgules).
 ORIGINES = "https://ouzgane.github.io"
 

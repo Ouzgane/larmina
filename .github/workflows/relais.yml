@@ -22,6 +22,7 @@ jobs:
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
       IA_CLE: ${{ secrets.IA_CLE }}
+      NOTION_CLE: ${{ secrets.NOTION_CLE }}
     steps:
       - uses: actions/checkout@v7
 
@@ -57,6 +58,11 @@ jobs:
         if: steps.verif.outputs.pret == 'true' && env.IA_CLE != ''
         working-directory: relais
         run: printf '%s' "$IA_CLE" | npx --yes wrangler@4 secret put IA_CLE
+
+      - name: Clé Notion (pour les mises à jour confirmées par Geri)
+        if: steps.verif.outputs.pret == 'true' && env.NOTION_CLE != ''
+        working-directory: relais
+        run: printf '%s' "$NOTION_CLE" | npx --yes wrangler@4 secret put NOTION_CLE
 
       - name: Brancher le site sur le relais
         if: steps.verif.outputs.pret == 'true'
