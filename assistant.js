@@ -30,7 +30,7 @@
   let voixChoisie = null, voixDebloquee = false;
 
   $('ia-nom').textContent = NOM;
-  orbe.setAttribute('aria-label', 'Ouvrir ' + NOM + ', l’assistant');
+  orbe.setAttribute('aria-label', 'Ouvrir ' + NOM + ', l’assistante');
   const etiquette = racine.querySelector('.ia-orbe-etiquette');
   if (etiquette) etiquette.textContent = 'Demander à ' + NOM;
   for (let i = 0; i < 28; i++) {
