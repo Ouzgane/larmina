@@ -259,6 +259,131 @@ body.verrouille { overflow: hidden; height: 100vh; }
 @keyframes hud-travel { from { left: 0; } to { left: calc(100% - 6px); } }
 @keyframes hud-in { from { opacity: 0; transform: translateY(14px) rotateX(8deg); } to { opacity: 1; transform: none; } }
 @keyframes hud-seg { from { opacity: 0; } to { opacity: 1; } }
+
+/* ── Assistant ─────────────────────────────────────────────────────────────── */
+#ia { --ia-c: #4de3ff; --ia-c2: #9befff; --ia-t: #dcf6ff; --ia-m: #84a7bd; --ia-l: rgba(77,227,255,.2); --ia-ok: #3dffb0; --ia-ko: #ff4f6e; --ia-v: #b48cff;
+  --ia-mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace; font-family: var(--font-anthropic-sans); color: var(--ia-t); }
+#ia[hidden], #ia [hidden] { display: none !important; }
+.ia-orbe { position: fixed; z-index: 90; right: max(18px, env(safe-area-inset-right)); bottom: max(18px, env(safe-area-inset-bottom)); width: 64px; height: 64px; padding: 0; border: 0; border-radius: 50%; cursor: pointer;
+  background: radial-gradient(circle at 50% 46%, rgba(220,250,255,.95) 0 7%, rgba(77,227,255,.75) 16%, rgba(30,110,160,.55) 34%, rgba(8,28,48,.95) 58%, rgba(3,9,17,.98) 70%);
+  box-shadow: 0 0 0 1px rgba(77,227,255,.55), 0 0 28px rgba(77,227,255,.45), 0 12px 32px rgba(0,0,0,.55); transition: transform .2s ease, box-shadow .2s ease; }
+.ia-orbe:hover, .ia-orbe:focus-visible { transform: scale(1.06); box-shadow: 0 0 0 1px rgba(155,239,255,.85), 0 0 40px rgba(77,227,255,.65), 0 12px 32px rgba(0,0,0,.55); outline: none; }
+.ia-orbe::before, .ia-orbe::after, .ia-orbe-noyau, .ia-orbe-ping { content: ""; position: absolute; border-radius: 50%; pointer-events: none; }
+.ia-orbe::before { inset: -7px; border: 1px dashed rgba(77,227,255,.55); }
+.ia-orbe::after { inset: -3px; border: 2px solid transparent; border-top-color: rgba(155,239,255,.95); border-left-color: rgba(180,140,255,.7); }
+.ia-orbe-noyau { inset: 25px; background: #eafcff; box-shadow: 0 0 14px #fff, 0 0 26px var(--ia-c); }
+.ia-orbe-ping { inset: 0; border: 1px solid rgba(77,227,255,.7); opacity: 0; }
+.ia-orbe-etiquette { position: absolute; right: 76px; top: 50%; transform: translate(8px, -50%); white-space: nowrap; pointer-events: none; opacity: 0; transition: opacity .2s, transform .2s;
+  font-family: var(--ia-mono); font-size: 10.5px; letter-spacing: .16em; text-transform: uppercase; color: var(--ia-c2); background: rgba(4,14,26,.92); border: 1px solid rgba(77,227,255,.35); border-radius: 999px; padding: 6px 12px; }
+.ia-orbe:hover .ia-orbe-etiquette, .ia-orbe:focus-visible .ia-orbe-etiquette, #ia.ia-appel .ia-orbe-etiquette { opacity: 1; transform: translate(0, -50%); }
+#ia.ia-ouvert .ia-orbe-etiquette { opacity: 0; }
+
+.ia-panneau { position: fixed; z-index: 91; right: max(18px, env(safe-area-inset-right)); bottom: calc(max(18px, env(safe-area-inset-bottom)) + 80px);
+  width: min(410px, calc(100vw - 24px)); height: min(620px, calc(100vh - 124px)); display: flex; flex-direction: column; overflow: hidden;
+  background: linear-gradient(165deg, rgba(12,40,66,.88), rgba(4,14,26,.95) 60%); border: 1px solid rgba(77,227,255,.38); border-radius: 18px;
+  box-shadow: 0 0 60px rgba(77,227,255,.16), 0 26px 80px rgba(0,0,0,.65); -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px);
+  opacity: 0; transform: translateY(16px) scale(.96); transform-origin: 92% 100%; transition: opacity .22s ease, transform .28s cubic-bezier(.2,.8,.2,1); }
+#ia.ia-ouvert .ia-panneau { opacity: 1; transform: none; }
+.ia-panneau::before { content: ""; position: absolute; inset: 0; pointer-events: none; border-radius: inherit;
+  background: repeating-linear-gradient(180deg, rgba(255,255,255,.018) 0 1px, transparent 1px 3px), radial-gradient(420px 200px at 85% 0%, rgba(77,227,255,.14), transparent 70%); }
+.ia-panneau::after { content: ""; position: absolute; top: -1px; left: -1px; width: 16px; height: 16px; border: 2px solid var(--ia-c); border-right: 0; border-bottom: 0; border-top-left-radius: 18px; opacity: .8; pointer-events: none; }
+
+.ia-tete { position: relative; display: flex; align-items: center; gap: 11px; padding: 13px 12px 10px 14px; }
+.ia-avatar { position: relative; flex: none; width: 30px; height: 30px; border-radius: 50%; background: radial-gradient(circle, #eafcff 0 16%, rgba(77,227,255,.8) 30%, rgba(8,28,48,.9) 64%); box-shadow: 0 0 14px rgba(77,227,255,.55); }
+.ia-avatar::after { content: ""; position: absolute; inset: -4px; border-radius: 50%; border: 1px solid transparent; border-top-color: var(--ia-c2); border-right-color: rgba(180,140,255,.6); }
+.ia-titre { display: flex; flex-direction: column; min-width: 0; margin-right: auto; }
+.ia-titre b { font-family: var(--ia-mono); font-weight: 500; font-size: 13px; letter-spacing: .26em; text-transform: uppercase; color: #fff; }
+.ia-etat { font-family: var(--ia-mono); font-size: 10px; letter-spacing: .12em; text-transform: uppercase; color: var(--ia-m); display: inline-flex; align-items: center; gap: 6px; margin-top: 2px; }
+.ia-etat::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--ia-m); }
+.ia-etat-ok::before { background: var(--ia-ok); box-shadow: 0 0 8px var(--ia-ok); }
+.ia-etat-ko::before { background: var(--ia-ko); box-shadow: 0 0 8px var(--ia-ko); }
+.ia-etat-actif::before { background: var(--ia-c); box-shadow: 0 0 8px var(--ia-c); }
+.ia-btn { appearance: none; flex: none; width: 34px; height: 34px; display: grid; place-items: center; padding: 0; border-radius: 10px; cursor: pointer;
+  color: var(--ia-c2); background: rgba(77,227,255,.06); border: 1px solid rgba(77,227,255,.28); transition: background .15s, box-shadow .15s; }
+.ia-btn:hover, .ia-btn:focus-visible { background: rgba(77,227,255,.16); box-shadow: 0 0 14px rgba(77,227,255,.25); outline: none; }
+.ia-btn svg { width: 16px; height: 16px; }
+.ia-btn[aria-pressed="false"] { color: var(--ia-m); }
+.ia-btn .ia-coupe { display: none; }
+.ia-btn[aria-pressed="false"] .ia-coupe { display: inline; }
+.ia-btn[aria-pressed="false"] .ia-son { display: none; }
+
+.ia-onde { position: relative; display: flex; align-items: center; gap: 3px; height: 26px; margin: 0 14px 4px; padding: 0 2px; border-top: 1px solid var(--ia-l); border-bottom: 1px solid var(--ia-l); }
+.ia-onde i { flex: 1; height: 16px; border-radius: 2px; background: linear-gradient(180deg, var(--ia-c2), rgba(180,140,255,.7)); transform: scaleY(.1); opacity: .5; transition: transform .3s ease, opacity .3s; }
+#ia.ia-parle .ia-onde i { opacity: .95; }
+#ia.ia-muet .ia-onde i { opacity: .25; }
+
+.ia-fil { position: relative; list-style: none; margin: 0; padding: 12px 14px 8px; flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; overscroll-behavior: contain;
+  scrollbar-width: thin; scrollbar-color: rgba(77,227,255,.3) transparent; }
+.ia-msg { max-width: 88%; padding: 9px 12px 10px; border-radius: 13px; font-size: 14px; line-height: 1.52; overflow-wrap: anywhere; }
+.ia-msg p { margin: 0; } .ia-msg p + p, .ia-msg p + ul, .ia-msg ul + p { margin-top: 7px; }
+.ia-msg ul { margin: 4px 0 0; padding-left: 18px; } .ia-msg li + li { margin-top: 3px; }
+.ia-msg b { color: #fff; font-weight: 600; }
+.ia-msg-moi { align-self: flex-end; background: linear-gradient(160deg, rgba(77,227,255,.2), rgba(77,227,255,.1)); border: 1px solid rgba(77,227,255,.38); border-bottom-right-radius: 4px; color: #f2fcff; }
+.ia-msg-ia { position: relative; align-self: flex-start; background: rgba(255,255,255,.035); border: 1px solid var(--ia-l); border-bottom-left-radius: 4px; padding-left: 14px; }
+.ia-msg-ia::before { content: ""; position: absolute; left: 0; top: 10px; bottom: 10px; width: 2px; border-radius: 2px; background: linear-gradient(180deg, var(--ia-c), var(--ia-v)); box-shadow: 0 0 8px rgba(77,227,255,.6); }
+.ia-msg-erreur { border-color: rgba(255,79,110,.4); background: rgba(255,79,110,.06); color: #ffd0d8; }
+.ia-msg-erreur::before { background: var(--ia-ko); box-shadow: 0 0 8px rgba(255,79,110,.6); }
+.ia-msg-erreur .ia-qui { color: #ff8fa3; }
+.ia-qui { display: flex; align-items: center; gap: 6px; margin-bottom: 3px; font-family: var(--ia-mono); font-size: 9.5px; letter-spacing: .2em; text-transform: uppercase; color: var(--ia-c); }
+.ia-rejouer { appearance: none; display: inline-grid; place-items: center; width: 20px; height: 20px; padding: 0; border: 0; border-radius: 6px; background: transparent; color: var(--ia-m); cursor: pointer; }
+.ia-rejouer:hover, .ia-rejouer:focus-visible { color: var(--ia-c2); background: rgba(77,227,255,.12); outline: none; }
+.ia-rejouer svg { width: 13px; height: 13px; }
+.ia-ecrit .ia-corps::after { content: ""; display: inline-block; width: 7px; height: 1em; margin-left: 2px; vertical-align: -2px; background: var(--ia-c); box-shadow: 0 0 8px var(--ia-c); }
+.ia-attente .ia-corps { display: flex; align-items: center; gap: 10px; color: var(--ia-m); font-family: var(--ia-mono); font-size: 11.5px; letter-spacing: .06em; }
+.ia-points { display: inline-flex; gap: 4px; } .ia-points i { width: 6px; height: 6px; border-radius: 50%; background: var(--ia-c); box-shadow: 0 0 8px var(--ia-c); }
+
+.ia-suggestions { position: relative; display: flex; flex-wrap: wrap; gap: 6px; padding: 2px 14px 10px; }
+.ia-puce { appearance: none; font: inherit; font-size: 12.5px; line-height: 1.3; text-align: left; color: var(--ia-c2); cursor: pointer; padding: 6px 11px 6px 9px; border-radius: 999px;
+  background: rgba(77,227,255,.06); border: 1px solid rgba(77,227,255,.36); transition: background .15s, box-shadow .15s, transform .15s; }
+.ia-puce::before { content: "›"; margin-right: 6px; color: var(--ia-c); font-weight: 700; }
+.ia-puce:hover, .ia-puce:focus-visible { background: rgba(77,227,255,.17); box-shadow: 0 0 16px rgba(77,227,255,.28); outline: none; transform: translateY(-1px); }
+.ia-puce-rejouer::before { content: none; }
+
+.ia-saisie { position: relative; display: flex; align-items: flex-end; gap: 8px; padding: 10px 12px; border-top: 1px solid var(--ia-l); background: rgba(3,9,17,.55); }
+.ia-saisie textarea { flex: 1; min-width: 0; resize: none; height: 42px; min-height: 42px; max-height: 120px; overflow-y: hidden; box-sizing: border-box; margin: 0; padding: 10px 12px; font: inherit; font-size: 14px; line-height: 1.4; color: var(--ia-t);
+  background: rgba(3,9,17,.75); border: 1px solid rgba(77,227,255,.3); border-radius: 12px; outline: none; transition: border-color .15s, box-shadow .15s; }
+.ia-saisie textarea::placeholder { color: #5f8299; }
+.ia-saisie textarea:focus { border-color: var(--ia-c); box-shadow: 0 0 0 3px rgba(77,227,255,.14), 0 0 18px rgba(77,227,255,.12); }
+.ia-envoyer { flex: none; width: 42px; height: 42px; display: grid; place-items: center; padding: 0; border-radius: 12px; cursor: pointer; color: #fff;
+  background: linear-gradient(180deg, rgba(77,227,255,.42), rgba(77,227,255,.14)); border: 1px solid rgba(155,239,255,.6); box-shadow: 0 0 16px rgba(77,227,255,.25); }
+.ia-envoyer:hover, .ia-envoyer:focus-visible { box-shadow: 0 0 24px rgba(77,227,255,.5); outline: none; }
+.ia-envoyer:disabled { opacity: .45; cursor: progress; box-shadow: none; }
+.ia-envoyer svg { width: 18px; height: 18px; }
+.ia-pied { position: relative; margin: 0; padding: 0 14px 10px; display: flex; flex-wrap: wrap; gap: 4px 8px; font-family: var(--ia-mono); font-size: 9.5px; letter-spacing: .12em; text-transform: uppercase; color: var(--ia-m); background: rgba(3,9,17,.55); }
+.ia-pied b { color: var(--ia-c2); font-weight: 500; }
+.ia-masque { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+@media (max-width: 540px) {
+  .ia-panneau { left: 8px; right: 8px; width: auto; bottom: calc(max(10px, env(safe-area-inset-bottom)) + 80px); height: min(74vh, 620px); }
+  .ia-saisie textarea { font-size: 16px; }
+  .ia-orbe-etiquette { display: none; }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .ia-orbe::before { animation: ia-tourne 16s linear infinite; }
+  .ia-orbe::after { animation: ia-tourne 3.2s linear infinite; }
+  .ia-orbe-noyau { animation: ia-souffle 3.4s ease-in-out infinite; }
+  #ia.ia-appel .ia-orbe-ping { animation: ia-ping 2.6s ease-out infinite; }
+  #ia.ia-parle .ia-orbe::after, #ia.ia-reflechit .ia-orbe::after { animation-duration: .9s; }
+  #ia.ia-parle .ia-orbe-noyau { animation-duration: .55s; }
+  .ia-avatar::after { animation: ia-tourne 4s linear infinite; }
+  #ia.ia-parle .ia-avatar::after, #ia.ia-reflechit .ia-avatar::after { animation-duration: .8s; }
+  .ia-onde i { animation: ia-veille 3.6s ease-in-out infinite; animation-delay: calc(var(--i) * -130ms); }
+  #ia.ia-parle .ia-onde i { animation: ia-barre calc(.46s + var(--j) * .09s) ease-in-out infinite alternate; animation-delay: calc(var(--i) * -61ms); }
+  #ia.ia-reflechit .ia-onde i { animation: ia-balaye 1.3s ease-in-out infinite; animation-delay: calc(var(--i) * 38ms); }
+  .ia-points i { animation: ia-point 1.1s ease-in-out infinite; } .ia-points i:nth-child(2) { animation-delay: .15s; } .ia-points i:nth-child(3) { animation-delay: .3s; }
+  .ia-ecrit .ia-corps::after { animation: ia-curseur .7s steps(2) infinite; }
+  .ia-msg { animation: ia-entree .28s cubic-bezier(.2,.8,.2,1) both; }
+}
+@keyframes ia-tourne { to { transform: rotate(360deg); } }
+@keyframes ia-souffle { 0%, 100% { transform: scale(.92); opacity: .85; } 50% { transform: scale(1.12); opacity: 1; } }
+@keyframes ia-ping { 0% { transform: scale(1); opacity: .7; } 100% { transform: scale(1.9); opacity: 0; } }
+@keyframes ia-veille { 0%, 100% { transform: scaleY(.08); } 50% { transform: scaleY(.22); } }
+@keyframes ia-barre { from { transform: scaleY(.15); } to { transform: scaleY(1); } }
+@keyframes ia-balaye { 0%, 100% { transform: scaleY(.1); opacity: .4; } 30% { transform: scaleY(.75); opacity: 1; } }
+@keyframes ia-point { 0%, 80%, 100% { opacity: .25; transform: translateY(0); } 40% { opacity: 1; transform: translateY(-3px); } }
+@keyframes ia-curseur { 50% { opacity: 0; } }
+@keyframes ia-entree { from { opacity: 0; transform: translateY(8px); } }
 </style>
 </head>
 <body class="verrouille">
@@ -404,14 +529,46 @@ body.verrouille { overflow: hidden; height: 100vh; }
       <dt>Décision</dt><dd>La tienne. Claude ne la modifie jamais ; dis-lui ce que tu décides et il l'enregistre.</dd>
       <dt>Revenus</dt><dd>Uniquement les encaissements du journal des revenus, en euros. Aucun montant estimé.</dd>
       <dt>Accès</dt><dd>Les données sont chiffrées (AES-256) et ne se lisent qu'avec le mot de passe, directement dans ton navigateur. « Verrouiller » efface le mot de passe mémorisé sur cet appareil.</dd>
+      <dt>Assistant</dt><dd>Le bouton lumineux en bas à droite ouvre l'assistant. Il répond par écrit et à voix haute à partir des données de ce tableau. Il n'écoute jamais : aucun micro n'est utilisé. Il ne modifie rien. Le bouton haut-parleur coupe la voix.</dd>
       <dt>Animations</dt><dd>Elles s'arrêtent si ton système demande de réduire les animations.</dd>
     </dl>
   </details>
 </div>
 </div>
+<div id="ia" hidden>
+  <button class="ia-orbe" id="ia-orbe" type="button" aria-controls="ia-panneau" aria-expanded="false">
+    <span class="ia-orbe-noyau" aria-hidden="true"></span><span class="ia-orbe-ping" aria-hidden="true"></span>
+    <span class="ia-orbe-etiquette" aria-hidden="true">Demander à l'assistant</span>
+  </button>
+  <section class="ia-panneau" id="ia-panneau" role="dialog" aria-labelledby="ia-nom" hidden>
+    <header class="ia-tete">
+      <span class="ia-avatar" aria-hidden="true"></span>
+      <div class="ia-titre"><b id="ia-nom">Assistant</b><span class="ia-etat" id="ia-etat" role="status">Prêt</span></div>
+      <button class="ia-btn" id="ia-voix" type="button" aria-pressed="true" title="Couper la voix" aria-label="Couper la voix">
+        <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 6h3l4-3v10l-4-3H2z" fill="currentColor"/><g class="ia-son" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><path d="M11 5.5a3.5 3.5 0 0 1 0 5"/><path d="M12.8 3.6a6 6 0 0 1 0 8.8"/></g><g class="ia-coupe" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M11 6l4 4M15 6l-4 4"/></g></svg>
+      </button>
+      <button class="ia-btn" id="ia-fermer" type="button" title="Fermer" aria-label="Fermer l'assistant">
+        <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+      </button>
+    </header>
+    <div class="ia-onde" id="ia-onde" aria-hidden="true"></div>
+    <ol class="ia-fil" id="ia-fil" aria-live="polite" aria-label="Conversation"></ol>
+    <div class="ia-suggestions" id="ia-suggestions" aria-label="Suggestions" hidden></div>
+    <form class="ia-saisie" id="ia-form" autocomplete="off">
+      <label class="ia-masque" for="ia-champ">Ton message</label>
+      <textarea id="ia-champ" rows="1" maxlength="1500" placeholder="Écris ta question…" enterkeyhint="send"></textarea>
+      <button class="ia-envoyer" id="ia-envoyer" type="submit" aria-label="Envoyer">
+        <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 10l14-7-5 15-2.5-6.5z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M9.5 11.5L17 3" stroke="currentColor" stroke-width="1.6"/></svg>
+      </button>
+    </form>
+    <p class="ia-pied"><span>Écrit seulement · aucune écoute</span><span>·</span><b id="ia-modele">…</b></p>
+  </section>
+</div>
 <script src="vendor/d3.min.js"></script>
 <script src="dash-shim.js"></script>
 <script src="app.js"></script>
+<script src="config.js"></script>
+<script src="assistant.js"></script>
 <script src="acces.js"></script>
 </body>
 </html>

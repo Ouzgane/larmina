@@ -1,0 +1,10 @@
+{
+  "name": "larmina-ia",
+  "private": true,
+  "type": "module",
+  "description": "Relais IA du tableau de pilotage, indépendant du modèle",
+  "scripts": {
+    "test": "node --test",
+    "verifier": "npx --yes wrangler@4 deploy --dry-run --outdir .build"
+  }
+}

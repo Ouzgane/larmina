@@ -1,0 +1,33 @@
+# Relais IA du tableau de pilotage (Cloudflare Worker).
+# Le site parle à ce relais ; le relais parle au modèle. Aucune clé n'est dans le navigateur.
+
+name = "larmina-ia"
+main = "src/index.js"
+compatibility_date = "2025-09-01"
+workers_dev = true
+
+# Accès à Workers AI (modèles hébergés par Cloudflare, quota gratuit de 10 000 neurones par jour).
+[ai]
+binding = "AI"
+
+[vars]
+# ─────────────────────────────────────────────────────────────────────────────
+#  CHANGER DE MODÈLE : modifier IA_FOURNISSEUR (et IA_MODELE si besoin), pousser.
+#  cloudflare | anthropic | openai | mistral | groq | gemini | openrouter | compatible
+#  Tous sauf « cloudflare » demandent la clé du fournisseur dans le secret GitHub IA_CLE.
+# ─────────────────────────────────────────────────────────────────────────────
+IA_FOURNISSEUR = "cloudflare"
+# Vide = modèle par défaut du fournisseur (voir src/fournisseurs.js).
+IA_MODELE = ""
+# Seulement pour « compatible » : adresse complète …/v1/chat/completions.
+IA_URL = ""
+# Plafond de jetons générés par réponse.
+MAX_TOKENS = "1200"
+
+# Sites autorisés à appeler le relais (séparés par des virgules).
+ORIGINES = "https://ouzgane.github.io"
+
+# Empreinte SHA-256 du jeton d'accès. Le jeton est dérivé du mot de passe du site
+# dans le navigateur (PBKDF2, 310 000 itérations) : sans mot de passe, pas d'IA.
+# Recalculer avec « node outils/empreinte-ia.mjs » si le mot de passe change.
+JETON_EMPREINTE = "6ef0f110b6b13dd827e4bceb3744c6e50b819b450001792b6879eb8f54e4f106"

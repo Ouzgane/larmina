@@ -30,12 +30,14 @@
     return JSON.parse(new TextDecoder().decode(clair));
   }
 
-  function ouvrir(paquet, env) {
+  function ouvrir(paquet, env, mdp) {
     if (publie && env.publie_le) {
       const d = new Date(env.publie_le);
       publie.textContent = d.toLocaleString('fr-FR', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' });
     }
     window.PILOTAGE.charger(paquet);
+    // L'assistant dérive son jeton d'accès du mot de passe ; le mot de passe lui-même n'est pas envoyé.
+    if (window.ASSISTANT) window.ASSISTANT.activer(mdp, paquet);
     ecran.classList.add('acces-ouvert');
     setTimeout(() => { ecran.hidden = true; }, 700);
     document.body.classList.remove('verrouille');
@@ -53,7 +55,7 @@
         throw new Error(auto ? 'Le mot de passe mémorisé ne fonctionne plus : saisis-le à nouveau.' : 'Mot de passe incorrect.');
       }
       if (memo.checked) ecrire(MEMO, mdp); else if (!auto) ecrire(MEMO, null);
-      ouvrir(paquet, env);
+      ouvrir(paquet, env, mdp);
     } catch (e) {
       msg.textContent = e.message;
       msg.className = 'acces-msg acces-erreur';

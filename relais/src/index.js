@@ -1,0 +1,117 @@
+// Relais IA du tableau de pilotage.
+// POST /discuter  { messages: [{ role, content }], contexte, nom }  →  { reponse, suggestions, fournisseur, modele }
+// GET  /          état du relais (fournisseur et modèle actifs), sans aucune donnée.
+
+import { appeler, decrireFournisseur, ErreurConfig, ErreurQuota } from './fournisseurs.js';
+import { consignes, extraireSuggestions } from './consignes.js';
+
+const LIMITES = { corps: 96000, historique: 14, message: 2000, contexte: 30000 };
+
+export default {
+  async fetch(request, env) {
+    const url = new URL(request.url);
+    const origine = request.headers.get('Origin');
+    const cors = entetesCors(origine, env);
+
+    if (request.method === 'OPTIONS') {
+      return cors ? new Response(null, { status: 204, headers: cors }) : new Response(null, { status: 403 });
+    }
+    if (origine && !cors) return json({ erreur: 'Origine non autorisée.' }, 403);
+
+    if (request.method === 'GET' && url.pathname === '/') {
+      try {
+        const cfg = decrireFournisseur(env);
+        return json({ service: 'Relais IA du pilotage', fournisseur: cfg.nom, modele: cfg.modele, pret: true }, 200, cors);
+      } catch (e) {
+        return json({ service: 'Relais IA du pilotage', pret: false, erreur: e.message }, 200, cors);
+      }
+    }
+    if (url.pathname !== '/discuter') return json({ erreur: 'Adresse inconnue.' }, 404, cors);
+    if (request.method !== 'POST') return json({ erreur: 'Méthode non autorisée.' }, 405, cors);
+
+    if (!(await jetonValide(request, env))) return json({ erreur: 'Accès refusé.' }, 401, cors);
+
+    let corps;
+    try {
+      const brut = await request.text();
+      if (brut.length > LIMITES.corps) return json({ erreur: 'Message trop long.' }, 413, cors);
+      corps = JSON.parse(brut);
+    } catch (e) {
+      return json({ erreur: 'Requête illisible.' }, 400, cors);
+    }
+
+    const messages = normaliser(corps && corps.messages);
+    if (!messages.length || messages[messages.length - 1].role !== 'user') return json({ erreur: 'Aucune question à traiter.' }, 400, cors);
+    if (messages.some((m) => m.content.length > LIMITES.message)) return json({ erreur: `Un message dépasse ${LIMITES.message} caractères.` }, 413, cors);
+
+    const contexte = typeof corps.contexte === 'string' ? corps.contexte.slice(0, LIMITES.contexte) : '';
+    const nom = typeof corps.nom === 'string' && /^[\p{L}][\p{L}\p{N} .'-]{0,23}$/u.test(corps.nom.trim()) ? corps.nom.trim() : 'Larmina';
+    const date = new Date().toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', timeZone: 'Europe/Paris' });
+
+    let cfg;
+    try {
+      cfg = decrireFournisseur(env);
+      const maxTokens = Math.min(Math.max(parseInt(env.MAX_TOKENS, 10) || 1200, 200), 4000);
+      const brut = await appeler(cfg, { systeme: consignes({ nom, date, contexte }), messages, maxTokens }, env);
+      const { texte, suggestions } = extraireSuggestions(brut);
+      return json({ reponse: texte || 'Je n’ai pas de réponse nette à cela. Peux-tu reformuler ?', suggestions, fournisseur: cfg.nom, modele: cfg.modele }, 200, cors);
+    } catch (e) {
+      console.error('relais', cfg && cfg.nom, e && (e.stack || e.message || e));
+      if (e instanceof ErreurQuota) return json({ erreur: e.message, code: 'quota' }, 429, cors);
+      if (e instanceof ErreurConfig) return json({ erreur: e.message, code: 'config' }, 500, cors);
+      return json({ erreur: 'Le modèle n’a pas répondu. Réessaie dans un instant.', code: 'fournisseur' }, 502, cors);
+    }
+  },
+};
+
+// Garde les rôles utiles, fusionne les tours consécutifs du même rôle, commence par une question.
+export function normaliser(liste) {
+  if (!Array.isArray(liste)) return [];
+  const sortie = [];
+  for (const m of liste.slice(-LIMITES.historique * 2)) {
+    if (!m || (m.role !== 'user' && m.role !== 'assistant') || typeof m.content !== 'string') continue;
+    const content = m.content.trim();
+    if (!content) continue;
+    const dernier = sortie[sortie.length - 1];
+    if (dernier && dernier.role === m.role) dernier.content += '\n\n' + content;
+    else sortie.push({ role: m.role, content });
+  }
+  while (sortie.length && sortie[0].role !== 'user') sortie.shift();
+  return sortie.slice(-LIMITES.historique);
+}
+
+function entetesCors(origine, env) {
+  if (!origine) return null;
+  const permises = String(env.ORIGINES || '').split(',').map((s) => s.trim().replace(/\/+$/, '')).filter(Boolean);
+  if (!permises.includes(origine)) return null;
+  return {
+    'Access-Control-Allow-Origin': origine,
+    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+    'Access-Control-Allow-Headers': 'Authorization, Content-Type',
+    'Access-Control-Max-Age': '86400',
+    Vary: 'Origin',
+  };
+}
+
+async function jetonValide(request, env) {
+  const attendu = String(env.JETON_EMPREINTE || '').trim().toLowerCase();
+  if (!/^[0-9a-f]{64}$/.test(attendu)) return false; // pas d'empreinte configurée : tout est refusé
+  const m = /^Bearer\s+([0-9a-f]{64})$/i.exec(request.headers.get('Authorization') || '');
+  if (!m) return false;
+  const empreinte = await sha256(m[1].toLowerCase());
+  let diff = 0;
+  for (let i = 0; i < 64; i++) diff |= empreinte.charCodeAt(i) ^ attendu.charCodeAt(i);
+  return diff === 0;
+}
+
+async function sha256(texte) {
+  const h = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(texte));
+  return [...new Uint8Array(h)].map((b) => b.toString(16).padStart(2, '0')).join('');
+}
+
+function json(objet, statut, cors) {
+  return new Response(JSON.stringify(objet), {
+    status: statut,
+    headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store', ...(cors || {}) },
+  });
+}

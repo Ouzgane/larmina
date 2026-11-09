@@ -1,6 +1,6 @@
 # Pilotage des projets
 
-Version en ligne du tableau de pilotage du portefeuille de projets : revenus, briefing du jour, matrice d'arbitrage en 3D, fiches projets et trajectoires.
+Version en ligne du tableau de pilotage du portefeuille de projets : revenus, briefing du jour, matrice d'arbitrage en 3D, fiches projets et trajectoires. Un assistant, Larmina, répond aux questions sur le tableau, par écrit et à voix haute.
 
 ## Confidentialité
 
@@ -19,13 +19,70 @@ PILOTAGE_MDP='…' node outils/publier.mjs clair
 PILOTAGE_MDP='…' node outils/verifier.mjs
 ```
 
-Pour changer de mot de passe : republier avec le nouveau, puis mettre à jour la tâche planifiée.
+Pour changer de mot de passe : republier avec le nouveau, mettre à jour la tâche planifiée, puis l'empreinte de l'assistant (voir plus bas).
+
+## Assistant IA
+
+On écrit à l'assistant, il répond par écrit et à voix haute, et propose des relances à cliquer. Il n'utilise jamais le micro. La voix est la synthèse vocale du navigateur, elle ne coûte rien ; le bouton haut-parleur la coupe.
+
+```
+navigateur ──(question + résumé des données)──▶ relais Cloudflare ──▶ modèle
+```
+
+- Le **relais** (`relais/`) est un petit Cloudflare Worker. Il garde les clés, choisit le modèle et lui donne ses consignes. Le site ne connaît que l'adresse du relais : **changer de modèle ne touche pas au site**.
+- **Accès** : le navigateur dérive un jeton du mot de passe (PBKDF2, 310 000 itérations) ; le relais n'en connaît que l'empreinte (`JETON_EMPREINTE`). Sans le mot de passe, le relais refuse tout. Il n'accepte aussi que les appels venant de `ouzgane.github.io`.
+- **Données** : à chaque question, le navigateur envoie un résumé des données déchiffrées (environ 11 000 caractères). Le relais ne stocke rien.
+
+### Modèle actuel
+
+Cloudflare Workers AI, modèle `@cf/openai/gpt-oss-120b`. Gratuit dans la limite de 10 000 neurones par jour, soit environ 50 à 60 questions par jour avec ce modèle. Au-delà, l'assistant l'annonce et reprend le lendemain (0 h UTC) : aucun frais possible sur le plan gratuit. Cloudflare n'utilise pas les requêtes pour entraîner des modèles.
+
+### Changer de modèle
+
+Tout se règle dans `relais/wrangler.toml`. On pousse, le relais se redéploie seul.
+
+1. Changer `IA_FOURNISSEUR` (et `IA_MODELE` pour un autre modèle que celui par défaut).
+2. Hors Cloudflare : ajouter la clé du fournisseur dans le secret GitHub `IA_CLE`.
+
+| `IA_FOURNISSEUR` | Modèle par défaut | Clé `IA_CLE` | Remarque |
+|---|---|---|---|
+| `cloudflare` | `@cf/openai/gpt-oss-120b` | aucune | Autre choix économique : `@cf/google/gemma-4-26b-a4b-it`, environ 3 fois plus de questions par jour. |
+| `anthropic` | `claude-haiku-5-5` | console.anthropic.com | Payant à l'usage. |
+| `openai` | `gpt-5-mini` | platform.openai.com | Payant à l'usage. |
+| `mistral` | `mistral-small-latest` | console.mistral.ai | Payant à l'usage, hébergé en Europe. |
+| `groq` | `openai/gpt-oss-120b` | console.groq.com | Gratuit avec limites. |
+| `gemini` | `gemini-flash-latest` | aistudio.google.com | Offre gratuite : Google peut utiliser les échanges pour améliorer ses produits. |
+| `openrouter` | `openai/gpt-oss-120b` | openrouter.ai | Des centaines de modèles avec une seule clé. |
+| `compatible` | à indiquer | selon le service | Toute API compatible OpenAI : renseigner aussi `IA_URL` (…/chat/completions). |
+
+Les noms de modèles par défaut changent avec le temps : en cas d'erreur, vérifier le nom exact chez le fournisseur et le mettre dans `IA_MODELE`. Pour ajouter un fournisseur : une ligne dans `PRESETS` (`relais/src/fournisseurs.js`).
+
+### Mise en service (une seule fois)
+
+1. Compte Cloudflare gratuit sur dash.cloudflare.com. Ouvrir une fois **Workers & Pages** pour choisir le sous-domaine `….workers.dev`.
+2. **Account ID** : visible dans **Workers & Pages**, colonne de droite.
+3. **Jeton d'API** : My Profile → API Tokens → Create Token → modèle **Edit Cloudflare Workers**, puis ajouter la permission **Account · Workers AI · Read**.
+4. Dans GitHub, dépôt larmina → Settings → Secrets and variables → Actions : créer `CLOUDFLARE_API_TOKEN` et `CLOUDFLARE_ACCOUNT_ID`.
+5. Onglet Actions → **Relais IA** → Run workflow. Le workflow teste le relais, le déploie, puis écrit son adresse dans `config.js` : le site est branché.
+
+### Vérifier
+
+```sh
+cd relais && npm test                          # tests du relais, sans réseau
+curl https://larmina-ia.<sous-domaine>.workers.dev/   # fournisseur et modèle actifs
+```
+
+Si le mot de passe du site change : `PILOTAGE_MDP='…' node outils/empreinte-ia.mjs`, recopier la valeur dans `JETON_EMPREINTE`, pousser.
 
 ## Fichiers
 
-- `index.html` : la page et son écran d'accès.
+- `index.html` : la page, son écran d'accès et le panneau de l'assistant.
 - `app.js` : calculs et dessins, repris du tableau de bord Claude.
 - `dash-shim.js` : fournit les données déchiffrées à `app.js`.
 - `acces.js` : téléchargement, déchiffrement et mémorisation du mot de passe.
+- `assistant.js` : le chat, la voix, les relances et le résumé des données envoyé au relais.
+- `config.js` : adresse du relais et nom de l'assistant.
+- `relais/` : le relais IA (Cloudflare Worker) et ses tests.
+- `.github/workflows/relais.yml` : déploiement automatique du relais.
 - `vendor/d3.min.js` : D3 v7.9 (licence ISC).
-- `outils/` : publication et vérification du fichier chiffré (Node 20 ou plus, sans dépendance).
+- `outils/` : publication et vérification du fichier chiffré, empreinte de l'assistant (Node 20 ou plus, sans dépendance).

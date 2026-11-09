@@ -3,3 +3,6 @@ clair/
 *.clair.json
 .env
 node_modules/
+relais/node_modules/
+relais/.build/
+.wrangler/
