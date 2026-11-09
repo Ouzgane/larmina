@@ -14,6 +14,8 @@
   const FOURNISSEURS = { cloudflare: 'Cloudflare', anthropic: 'Anthropic', openai: 'OpenAI', mistral: 'Mistral', groq: 'Groq', gemini: 'Google', openrouter: 'OpenRouter', compatible: 'API compatible' };
 
   const $ = (id) => document.getElementById(id);
+  // Signaux pour la sphère centrale (geri.js) : état, mots prononcés, passages lus.
+  const emettre = (nom, detail) => document.dispatchEvent(new CustomEvent('geri:' + nom, { detail: detail || {} }));
   const racine = $('ia');
   if (!racine) return;
   const orbe = $('ia-orbe'), panneau = $('ia-panneau'), fil = $('ia-fil'), zonePuces = $('ia-suggestions');
@@ -149,6 +151,7 @@
     clearTimeout(veille);
     if (synth) { try { synth.cancel(); } catch (e) { /* rien */ } }
     racine.classList.remove('ia-parle');
+    emettre('etat', { etat: 'veille' });
   }
 
   function signaler(texte) {
@@ -160,7 +163,7 @@
   }
 
   function parler(texte) {
-    if (!synth || !voixActive) return;
+    if (!synth || !voixActive) { emettre('texte', { texte: pourLaVoix(texte) }); return; }
     const morceaux = decouper(pourLaVoix(texte));
     if (!morceaux.length) return;
     const occupe = synth.speaking || synth.pending;
@@ -177,19 +180,25 @@
         if (voixChoisie) u.voice = voixChoisie;
         u.rate = 1.03;
         u.pitch = 1;
-        u.onstart = () => { demarre = true; clearTimeout(veille); racine.classList.add('ia-parle'); };
+        u.onstart = () => {
+          if (!demarre) emettre('etat', { etat: 'parle' });
+          demarre = true; clearTimeout(veille); racine.classList.add('ia-parle');
+          emettre('segment', { texte: m, duree: (m.length * 65) / u.rate });
+        };
+        u.onboundary = () => emettre('mot');
         u.onerror = (e) => {
           console.warn('[' + NOM + '] voix :', e && e.error);
           if (e && e.error === 'not-allowed') signaler('Le navigateur bloque la voix pour l\u2019instant. Clique sur le haut-parleur en haut du panneau pour l\u2019autoriser.');
-          if (i === morceaux.length - 1) racine.classList.remove('ia-parle');
+          if (i === morceaux.length - 1) { racine.classList.remove('ia-parle'); emettre('etat', { etat: 'veille' }); }
         };
-        if (i === morceaux.length - 1) u.onend = () => racine.classList.remove('ia-parle');
+        if (i === morceaux.length - 1) u.onend = () => { racine.classList.remove('ia-parle'); emettre('etat', { etat: 'veille' }); };
         enLecture.push(u);
         synth.speak(u);
       });
       clearTimeout(veille);
       veille = setTimeout(() => {
         if (demarre || g !== generation) return;
+        emettre('texte', { texte: morceaux.join(' ') });
         signaler('La voix ne démarre pas dans ce navigateur. Vérifie que le son de l\u2019onglet et de l\u2019ordinateur est activé, puis clique sur le haut-parleur pour un essai. Le navigateur intégré de l\u2019app Claude ne lit pas la voix.');
       }, 5000);
     };
@@ -301,6 +310,7 @@
     const { li, corps } = bulle('ia-msg-ia ia-attente', NOM);
     corps.innerHTML = '<span class="ia-points" aria-hidden="true"><i></i><i></i><i></i></span><span>Analyse du tableau…</span>';
     racine.classList.add('ia-reflechit');
+    emettre('etat', { etat: 'reflexion' });
     defiler();
     return { retirer() { li.remove(); racine.classList.remove('ia-reflechit'); } };
   }
@@ -379,6 +389,7 @@
       ajouterErreur(e.connue ? e.message : messageErreur(rep ? rep.status : 0, corps, e));
       puces([{ libelle: '↻ Réessayer', texte: question, rejouer: true }]);
       statut(rep && rep.status === 429 ? 'Limite atteinte' : 'Hors ligne', 'ia-etat-ko');
+      emettre('etat', { etat: 'veille' });
     } finally {
       enCours = false;
       envoyer.disabled = false;
@@ -426,10 +437,18 @@
   const liste = (l) => (l.length < 2 ? l.join('') : l.slice(0, -1).join(', ') + ' et ' + l[l.length - 1]);
 
   // ── Ouverture, fermeture, saisie ─────────────────────────────────────────────
+  // Sur grand écran, le contenu se décale pour que le panneau ne cache pas les indicateurs.
+  function amarrer(oui) {
+    document.body.classList.toggle('ia-amarre', oui);
+    clearTimeout(amarrer.t);
+    amarrer.t = setTimeout(() => { if (window.PILOTAGE && window.PILOTAGE.toutDessiner) window.PILOTAGE.toutDessiner(); }, 380);
+  }
+
   function ouvrir() {
     panneau.hidden = false;
     racine.classList.remove('ia-appel');
     requestAnimationFrame(() => racine.classList.add('ia-ouvert'));
+    amarrer(true);
     orbe.setAttribute('aria-expanded', 'true');
     debloquerVoix();
     sonder();
@@ -439,6 +458,7 @@
 
   function fermer() {
     racine.classList.remove('ia-ouvert');
+    amarrer(false);
     orbe.setAttribute('aria-expanded', 'false');
     taire();
     setTimeout(() => { if (!racine.classList.contains('ia-ouvert')) panneau.hidden = true; }, reduit ? 0 : 260);

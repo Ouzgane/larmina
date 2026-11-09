@@ -80,6 +80,7 @@ Si le mot de passe du site change : `PILOTAGE_MDP='…' node outils/empreinte-ia
 - `app.js` : calculs et dessins, repris du tableau de bord Claude.
 - `dash-shim.js` : fournit les données déchiffrées à `app.js`.
 - `acces.js` : téléchargement, déchiffrement et mémorisation du mot de passe.
+- `geri.js` : la sphère de Geri au centre de la page, ses ondes quand elle parle, et la mise en lumière des indicateurs qu'elle évoque.
 - `assistant.js` : le chat, la voix, les relances et le résumé des données envoyé au relais.
 - `config.js` : adresse du relais, nom de l'assistante, sa prononciation et sa voix.
 - `relais/` : le relais IA (Cloudflare Worker) et ses tests.
