@@ -64,7 +64,7 @@ export default {
       const { texte, suggestions, musique, actions } = analyser(brut);
       const cles = new Set(playlists.map((p) => p.cle));
       return json({
-        reponse: texte || 'C’est noté.',
+        reponse: texte || (notion && actions.length ? 'Voici ce que je te propose d’enregistrer dans Notion. Confirme pour que je l’écrive.' : 'C’est noté.'),
         suggestions,
         musique: musique && (musique === 'stop' || cles.has(musique)) ? musique : null,
         actions: notion ? actions : [],
