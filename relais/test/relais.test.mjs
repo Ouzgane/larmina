@@ -243,3 +243,32 @@ test('notion : la mise à jour confirmée est écrite sur la bonne page', async 
   const sans = envDe();
   assert.equal((await relais.fetch(requete({ projet: 'tablee', projet_nom: 'Tablée', champs: { decision: 'Accélérer' } }, { chemin: '/notion' }), sans.env)).status, 501);
 });
+
+test('Cloudflare : raisonnement gpt-oss qui fuit → modèle de secours, en français', async () => {
+  const fuite = 'analysis: summarize current situation.<|end|><|start|>assistantfinal: The projects must be paused until the revenue is there and it should be done.';
+  const { env, appels } = envDe({ reponseIA: (m) => (/gpt-oss/.test(m)
+    ? { output: [{ type: 'message', content: [{ type: 'output_text', text: fuite }] }] }
+    : { response: 'Aucun revenu pour l’instant : KitVital est le plus proche.\nSUGGESTIONS: Que faire ? | Et ensuite ?' }) });
+  const j = await (await relais.fetch(requete(question), env)).json();
+  assert.equal(j.reponse, 'Aucun revenu pour l’instant : KitVital est le plus proche.');
+  assert.equal(j.modele, '@cf/mistralai/mistral-small-3.1-24b-instruct');
+  // Le principal n'est pas rappelé dans l'autre format : on passe directement au secours.
+  assert.deepEqual(appels.map((a) => a.modele), ['@cf/openai/gpt-oss-120b', '@cf/mistralai/mistral-small-3.1-24b-instruct']);
+});
+
+test('Cloudflare : sans secours propre, la réponse est nettoyée plutôt que perdue', async () => {
+  const { env } = envDe({ IA_MODELE_SECOURS: 'aucun', reponseIA: () => ({ output: [{ type: 'message', content: [{ type: 'output_text', text: 'analysis: court.<|end|><|start|>assistant<|channel|>final<|message|>KitVital passe en premier.\nSUGGESTIONS: Pourquoi ? | Et après ?' }] }] }) });
+  const j = await (await relais.fetch(requete(question), env)).json();
+  assert.equal(j.reponse, 'KitVital passe en premier.');
+  assert.deepEqual(j.suggestions, ['Pourquoi ?', 'Et après ?']);
+});
+
+test('historique : une longue réponse passée est abrégée au lieu de bloquer', async () => {
+  const { env, appels } = envDe();
+  const long = { messages: [{ role: 'user', content: 'Résume.' }, { role: 'assistant', content: 'x'.repeat(5000) }, { role: 'user', content: 'Et ensuite ?' }], contexte: '', nom: 'Geri' };
+  const r = await relais.fetch(requete(long), env);
+  assert.equal(r.status, 200);
+  assert.ok(appels[0].entree.input[1].content.length <= 2000);
+  const tropLong = { messages: [{ role: 'user', content: 'y'.repeat(2500) }], contexte: '', nom: 'Geri' };
+  assert.equal((await relais.fetch(requete(tropLong), env)).status, 413);
+});

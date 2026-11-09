@@ -47,7 +47,7 @@ export default {
 
     const messages = normaliser(corps && corps.messages);
     if (!messages.length || messages[messages.length - 1].role !== 'user') return json({ erreur: 'Aucune question à traiter.' }, 400, cors);
-    if (messages.some((m) => m.content.length > LIMITES.message)) return json({ erreur: `Un message dépasse ${LIMITES.message} caractères.` }, 413, cors);
+    if (messages.some((m) => m.role === 'user' && m.content.length > LIMITES.message)) return json({ erreur: `Un message dépasse ${LIMITES.message} caractères.` }, 413, cors);
 
     const contexte = typeof corps.contexte === 'string' ? corps.contexte.slice(0, LIMITES.contexte) : '';
     const nom = typeof corps.nom === 'string' && /^[\p{L}][\p{L}\p{N} .'-]{0,23}$/u.test(corps.nom.trim()) ? corps.nom.trim() : 'Geri';
@@ -59,7 +59,8 @@ export default {
       const maxTokens = Math.min(Math.max(parseInt(env.MAX_TOKENS, 10) || 1200, 200), 4000);
       const playlists = Array.isArray(corps.playlists) ? corps.playlists.slice(0, 20).filter((p) => p && /^[a-z0-9-]{1,30}$/.test(p.cle)).map((p) => ({ cle: p.cle, nom: String(p.nom || p.cle).slice(0, 40) })) : [];
       const notion = !!(env.NOTION_CLE && env.NOTION_SOURCE);
-      const brut = await appeler(cfg, { systeme: consignes({ nom, date, contexte, playlists, notion }), messages, maxTokens }, env);
+      const requete = { systeme: consignes({ nom, date, contexte, playlists, notion }), messages, maxTokens };
+      const brut = await appeler(cfg, requete, env);
       const { texte, suggestions, musique, actions } = analyser(brut);
       const cles = new Set(playlists.map((p) => p.cle));
       return json({
@@ -68,7 +69,7 @@ export default {
         musique: musique && (musique === 'stop' || cles.has(musique)) ? musique : null,
         actions: notion ? actions : [],
         fournisseur: cfg.nom,
-        modele: cfg.modele,
+        modele: requete.modeleUtilise || cfg.modele,
       }, 200, cors);
     } catch (e) {
       console.error('relais', cfg && cfg.nom, e && (e.stack || e.message || e));
@@ -110,6 +111,8 @@ export function normaliser(liste) {
     else sortie.push({ role: m.role, content });
   }
   while (sortie.length && sortie[0].role !== 'user') sortie.shift();
+  // Une longue réponse passée de l'assistant ne doit pas bloquer la suite : on l'abrège.
+  for (const m of sortie) if (m.role === 'assistant' && m.content.length > LIMITES.message) m.content = m.content.slice(0, LIMITES.message - 1) + '…';
   return sortie.slice(-LIMITES.historique);
 }
 

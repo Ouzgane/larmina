@@ -19,6 +19,9 @@ binding = "AI"
 IA_FOURNISSEUR = "cloudflare"
 # Vide = modèle par défaut du fournisseur (voir src/fournisseurs.js).
 IA_MODELE = ""
+# Modèle appelé si le principal répond de travers (raisonnement qui fuit, anglais).
+# Vide = secours par défaut (Cloudflare : Mistral Small 3.1) ; « aucun » = pas de secours.
+IA_MODELE_SECOURS = ""
 # Seulement pour « compatible » : adresse complète …/v1/chat/completions.
 IA_URL = ""
 # Plafond de jetons générés par réponse.

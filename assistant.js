@@ -411,7 +411,7 @@
       await jetonPret;
       if (!jeton) throw Object.assign(new Error('Impossible de préparer l’accès sécurisé dans ce navigateur.'), { connue: true });
       const options = { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + jeton },
-        body: JSON.stringify({ messages: historique.slice(-HISTORIQUE), contexte: contexteTexte, nom: NOM, playlists: window.GERI_MUSIQUE ? window.GERI_MUSIQUE.playlists() : [] }) };
+        body: JSON.stringify({ messages: historique.slice(-HISTORIQUE).map((m) => ({ role: m.role, content: m.content.length > 1900 ? m.content.slice(0, 1899) + '…' : m.content })), contexte: contexteTexte, nom: NOM, playlists: window.GERI_MUSIQUE ? window.GERI_MUSIQUE.playlists() : [] }) };
       if (window.AbortSignal && AbortSignal.timeout) options.signal = AbortSignal.timeout(60000);
       rep = await fetch(RELAIS + '/discuter', options);
       try { corps = await rep.json(); } catch (e) { corps = null; }

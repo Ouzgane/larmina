@@ -71,6 +71,8 @@ Tout se règle dans `relais/wrangler.toml`. On pousse, le relais se redéploie s
 | `openrouter` | `openai/gpt-oss-120b` | openrouter.ai | Des centaines de modèles avec une seule clé. |
 | `compatible` | à indiquer | selon le service | Toute API compatible OpenAI : renseigner aussi `IA_URL` (…/chat/completions). |
 
+Avec Cloudflare, si gpt-oss renvoie une réponse inutilisable (son raisonnement qui fuit, ou une réponse en anglais), le relais repose la question à un modèle de secours, `@cf/mistralai/mistral-small-3.1-24b-instruct` par défaut, réglable avec `IA_MODELE_SECOURS` (« aucun » pour le désactiver).
+
 Les noms de modèles par défaut changent avec le temps : en cas d'erreur, vérifier le nom exact chez le fournisseur et le mettre dans `IA_MODELE`. Pour ajouter un fournisseur : une ligne dans `PRESETS` (`relais/src/fournisseurs.js`).
 
 ### Mise en service (une seule fois)

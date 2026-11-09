@@ -10,7 +10,8 @@ export class ErreurFournisseur extends Error {
 
 // adaptateur : forme de l'API ; url et modele : valeurs par défaut, remplaçables par IA_URL et IA_MODELE.
 export const PRESETS = {
-  cloudflare: { adaptateur: 'cloudflare', modele: '@cf/openai/gpt-oss-120b' },
+  // secours : modèle appelé si le principal renvoie une réponse inutilisable (fuite de raisonnement, anglais…).
+  cloudflare: { adaptateur: 'cloudflare', modele: '@cf/openai/gpt-oss-120b', secours: '@cf/mistralai/mistral-small-3.1-24b-instruct' },
   anthropic: { adaptateur: 'anthropic', url: 'https://api.anthropic.com/v1/messages', modele: 'claude-haiku-5-5' },
   openai: {
     adaptateur: 'openai', url: 'https://api.openai.com/v1/chat/completions', modele: 'gpt-5-mini',
@@ -36,6 +37,8 @@ export function decrireFournisseur(env) {
     url: String(env.IA_URL || '').trim() || preset.url,
     cle: env.IA_CLE ? String(env.IA_CLE).trim() : '',
     corps: preset.corps,
+    // IA_MODELE_SECOURS : autre modèle de secours, ou « aucun » pour s'en passer.
+    secours: modeleSecours(env, preset),
   };
   if (!cfg.modele) throw new ErreurConfig(`IA_MODELE est obligatoire pour « ${nom} ».`);
   if (cfg.adaptateur !== 'cloudflare' && !cfg.url) throw new ErreurConfig(`IA_URL est obligatoire pour « ${nom} ».`);
@@ -43,6 +46,12 @@ export function decrireFournisseur(env) {
     throw new ErreurConfig(`La clé du fournisseur « ${nom} » manque : ajoute le secret IA_CLE.`);
   }
   return cfg;
+}
+
+function modeleSecours(env, preset) {
+  const v = String(env.IA_MODELE_SECOURS || '').trim();
+  if (/^(aucun|none|non)$/i.test(v)) return '';
+  return v || preset.secours || '';
 }
 
 // requete : { systeme, messages: [{ role: 'user'|'assistant', content }], maxTokens }
@@ -59,25 +68,37 @@ const ADAPTATEURS = {
   async cloudflare(cfg, r, env) {
     if (!env.AI || typeof env.AI.run !== 'function') throw new ErreurConfig('Liaison Workers AI absente : vérifie la section [ai] de wrangler.toml.');
     const messages = [{ role: 'system', content: r.systeme }, ...r.messages];
-    const formats = {
+    const lancer = (format, modele) => format === 'responses'
       // Format « Responses » d'OpenAI, celui des modèles gpt-oss.
-      responses: () => env.AI.run(cfg.modele, { instructions: r.systeme, input: r.messages, reasoning: { effort: 'low' } }),
+      ? env.AI.run(modele, { instructions: r.systeme, input: r.messages, reasoning: { effort: 'low' } })
       // Format « messages », celui de la plupart des modèles de chat.
-      messages: () => env.AI.run(cfg.modele, { messages, max_tokens: r.maxTokens, temperature: 0.4 }),
-    };
-    const ordre = /gpt-oss/i.test(cfg.modele) ? ['responses', 'messages'] : ['messages'];
-    let derniere;
-    for (const f of ordre) {
+      : env.AI.run(modele, { messages, max_tokens: r.maxTokens, temperature: 0.4 });
+    const essais = [];
+    if (/gpt-oss/i.test(cfg.modele)) essais.push(['responses', cfg.modele]);
+    essais.push(['messages', cfg.modele]);
+    if (cfg.secours && cfg.secours !== cfg.modele) essais.push(['messages', cfg.secours]);
+
+    let derniere, principalDouteux = false;
+    const douteuses = [];
+    for (const [format, modele] of essais) {
+      // Le principal a déjà répondu de travers : on passe directement au secours.
+      if (principalDouteux && modele === cfg.modele) continue;
       try {
-        const texte = texteDe(await formats[f]());
-        if (texte) return texte;
-        derniere = new ErreurFournisseur('Réponse vide de Workers AI.', 502);
+        const brut = texteDe(await lancer(format, modele));
+        if (!brut) { derniere = new ErreurFournisseur('Réponse vide de Workers AI.', 502); continue; }
+        if (!estDouteux(brut)) { r.modeleUtilise = modele; return brut; }
+        console.warn('relais', 'réponse inutilisable de', modele, '(' + format + ')');
+        douteuses.push({ brut, modele });
+        if (modele === cfg.modele) principalDouteux = true;
       } catch (e) {
         if (estQuota(e)) throw new ErreurQuota('Le quota gratuit du jour de Workers AI est atteint. Il se renouvelle à 0 h UTC.');
         derniere = e;
       }
     }
-    throw derniere;
+    // Rien de propre : on rend la moins mauvaise réponse, nettoyée, plutôt qu'une erreur.
+    const repli = douteuses.find((d) => nettoyer(d.brut) && !estAnglais(nettoyer(d.brut))) || douteuses.find((d) => nettoyer(d.brut));
+    if (repli) { r.modeleUtilise = repli.modele; return repli.brut; }
+    throw derniere || new ErreurFournisseur('Réponse vide de Workers AI.', 502);
   },
 
   // API « chat completions » d'OpenAI et de tous les compatibles.
@@ -144,9 +165,39 @@ export function texteDe(x) {
   return '';
 }
 
-function nettoyer(t) {
-  return String(t || '')
+// Retire le raisonnement qui fuit parfois dans la réponse : balises <think> (Qwen, DeepSeek…)
+// et format « harmony » des modèles gpt-oss (analysis … <|end|><|start|>assistant final …).
+export function nettoyer(t) {
+  let s = String(t || '')
     .replace(/<think>[\s\S]*?<\/think>/gi, '')
-    .replace(/^[\s\S]*?<\/think>/i, '')
-    .trim();
+    .replace(/^[\s\S]*?<\/think>/i, '');
+  const finals = [
+    /<\|channel\|>\s*final\s*<\|message\|>/gi,
+    /<\|start\|>\s*assistant\s*(?:<\|channel\|>)?\s*final\s*(?:<\|message\|>)?\s*:?/gi,
+    /\bassistant\s*final\b\s*:?/gi,
+  ];
+  for (const re of finals) {
+    let fin = -1, m;
+    while ((m = re.exec(s))) fin = m.index + m[0].length;
+    if (fin >= 0) { s = s.slice(fin); break; }
+  }
+  return s.replace(/<\|[a-z_]+\|>/gi, '').trim();
+}
+
+// Une réponse est douteuse si le raisonnement du modèle a fui ou si elle est en anglais.
+export function estDouteux(brut) {
+  const t = String(brut || '');
+  if (/<\|(?:start|end|channel|message|return|call|constrain)\|>/i.test(t)) return true;
+  if (/^\s*(?:analysis|commentary)\b/i.test(t)) return true;
+  if (/\bassistant\s*(?:final|analysis|commentary)\b/i.test(t)) return true;
+  return estAnglais(nettoyer(t));
+}
+
+const MOTS_EN = new Set('the and of to is are was with for this that these until must be should will would have has your you it its in by from at not but they there which into than'.split(' '));
+const MOTS_FR = new Set('le la les et de des du un une est sont pour avec que qui dans sur pas au aux ce cette ces tu ton ta tes il elle en par ne plus mais ou se sa son leurs'.split(' '));
+export function estAnglais(t) {
+  const mots = String(t || '').toLowerCase().match(/[a-zàâçéèêëîïôûùüÿœ]+/g) || [];
+  let en = 0, fr = 0;
+  for (const m of mots) { if (MOTS_EN.has(m)) en++; else if (MOTS_FR.has(m)) fr++; }
+  return en >= 6 && en > fr * 1.5;
 }
