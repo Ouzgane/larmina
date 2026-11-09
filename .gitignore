@@ -1,0 +1,5 @@
+# Fichiers en clair : ne jamais les publier
+clair/
+*.clair.json
+.env
+node_modules/

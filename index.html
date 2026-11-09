@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow, noarchive">
+<meta name="referrer" content="no-referrer">
+<meta name="theme-color" content="#030911">
+<title>Pilotage des projets</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='13' fill='none' stroke='%234de3ff' stroke-width='2' stroke-dasharray='3 3'/%3E%3Ccircle cx='16' cy='16' r='6' fill='%234de3ff'/%3E%3C/svg%3E">
+<style>
+:root { color-scheme: dark;
+  --font-anthropic-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-anthropic-serif: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+  --cds-font-size-caption: 12.5px; --cds-font-size-body: 15px; --cds-font-size-heading: 18px; --cds-font-size-title: 30px; --cds-font-weight-medium: 500; }
+html, body { margin: 0; background: #030911; -webkit-font-smoothing: antialiased; }
+body.verrouille { overflow: hidden; height: 100vh; }
+#dash-root { min-height: 100vh; }
+.dash-select { appearance: none; -webkit-appearance: none; font: inherit; font-size: 12px; padding: 5px 28px 5px 10px; cursor: pointer;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%239befff' stroke-width='1.5'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right 10px center; }
+.dash-skeleton { color: transparent !important; border-radius: 4px; background: linear-gradient(90deg, rgba(77,227,255,.06), rgba(77,227,255,.16), rgba(77,227,255,.06)); background-size: 200% 100%; }
+.hud-lock { margin-left: auto; appearance: none; background: transparent; border: 1px solid rgba(77,227,255,.45); color: #9befff; border-radius: 999px; padding: 3px 10px;
+  font: inherit; font-size: 10px; letter-spacing: .14em; text-transform: uppercase; cursor: pointer; }
+.hud-lock:hover { background: rgba(77,227,255,.12); }
+
+/* Écran d'accès */
+.acces { position: fixed; inset: 0; z-index: 100; display: grid; place-items: center; padding: 20px;
+  background: radial-gradient(900px 500px at 50% 30%, rgba(77,227,255,.16), transparent 65%), linear-gradient(180deg, #06182a, #030911 70%);
+  transition: opacity .6s ease, transform .6s ease; font-family: var(--font-anthropic-sans); color: #dcf6ff; }
+.acces::before { content: ""; position: absolute; inset: 0; pointer-events: none;
+  background-image: linear-gradient(rgba(77,227,255,.06) 1px, transparent 1px), linear-gradient(90deg, rgba(77,227,255,.06) 1px, transparent 1px); background-size: 44px 44px; }
+.acces.acces-ouvert { opacity: 0; transform: scale(1.04); pointer-events: none; }
+.acces-anneaux { position: absolute; width: min(560px, 92vw); aspect-ratio: 1; pointer-events: none; }
+.acces-anneaux i { position: absolute; inset: 0; border-radius: 50%; border: 1px dashed rgba(77,227,255,.28); }
+.acces-anneaux i:nth-child(2) { inset: 9%; border-style: solid; border-color: rgba(77,227,255,.12); border-top-color: rgba(155,239,255,.7); }
+.acces-anneaux i:nth-child(3) { inset: 19%; border: 2px solid transparent; border-left-color: rgba(61,255,176,.55); border-right-color: rgba(180,140,255,.45); }
+.acces-boite { position: relative; width: min(360px, 100%); display: flex; flex-direction: column; gap: 12px; padding: 28px 26px;
+  background: linear-gradient(160deg, rgba(12,40,66,.75), rgba(6,20,36,.85)); border: 1px solid rgba(77,227,255,.35); border-radius: 16px;
+  box-shadow: 0 0 40px rgba(77,227,255,.15), 0 20px 60px rgba(0,0,0,.5); backdrop-filter: blur(8px); }
+.acces-statut { display: flex; align-items: center; gap: 8px; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 11px; letter-spacing: .2em; text-transform: uppercase; color: #ffbe4d; }
+.acces-statut .hud-pulse { background: #ffbe4d; box-shadow: 0 0 10px #ffbe4d; }
+.acces-titre { margin: 0 0 6px; font-family: var(--font-anthropic-serif); font-weight: 400; font-size: 28px; color: #fff; }
+.acces-label { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 10.5px; letter-spacing: .16em; text-transform: uppercase; color: #84a7bd; }
+.acces-boite input[type=password] { font: inherit; font-size: 16px; letter-spacing: .08em; padding: 11px 12px; border-radius: 10px; color: #fff;
+  background: rgba(3,14,26,.8); border: 1px solid rgba(77,227,255,.4); outline: none; }
+.acces-boite input[type=password]:focus { border-color: #4de3ff; box-shadow: 0 0 0 3px rgba(77,227,255,.18), 0 0 18px rgba(77,227,255,.25); }
+.acces-memo { display: flex; align-items: center; gap: 8px; font-size: 13px; color: #84a7bd; cursor: pointer; }
+.acces-memo input { accent-color: #4de3ff; }
+.acces-boite button { font: inherit; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 12px; letter-spacing: .18em; text-transform: uppercase;
+  padding: 11px; border-radius: 10px; border: 1px solid #4de3ff; color: #030911; background: linear-gradient(90deg, #4de3ff, #3dffb0); cursor: pointer;
+  box-shadow: 0 0 22px rgba(77,227,255,.35); }
+.acces-boite button:disabled { opacity: .6; cursor: progress; }
+.acces-msg { margin: 0; min-height: 1.2em; font-size: 12.5px; color: #84a7bd; }
+.acces-msg.acces-erreur { color: #ff4f6e; }
+@media (prefers-reduced-motion: no-preference) {
+  .dash-skeleton { animation: pp-sk 1.4s linear infinite; }
+  .acces-anneaux i:nth-child(1) { animation: hud-spin 60s linear infinite; }
+  .acces-anneaux i:nth-child(2) { animation: hud-spin 9s linear infinite; }
+  .acces-anneaux i:nth-child(3) { animation: hud-spin 14s linear infinite reverse; }
+  .acces-secoue .acces-boite { animation: pp-secoue .45s ease; }
+}
+@keyframes pp-sk { to { background-position: -200% 0; } }
+@keyframes pp-secoue { 20%, 60% { transform: translateX(-8px); } 40%, 80% { transform: translateX(8px); } }
+
+
+#dash-root { --dash-gutter: 0; }
+.pp {
+  --hud-bg: #030911; --hud-bg2: #06182a; --hud-panel: rgba(9, 30, 50, .58); --hud-panel2: rgba(12, 40, 66, .42);
+  --hud-line: rgba(77, 227, 255, .18); --hud-line2: rgba(77, 227, 255, .45);
+  --hud-cyan: #4de3ff; --hud-cyan2: #9befff; --hud-text: #dcf6ff; --hud-muted: #84a7bd;
+  --hud-ok: #3dffb0; --hud-warn: #ffbe4d; --hud-bad: #ff4f6e; --hud-pause: #8b93b8; --hud-violet: #b48cff;
+  --hud-mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+  position: relative; isolation: isolate; overflow: hidden; color: var(--hud-text); font-family: var(--font-anthropic-sans);
+  background:
+    radial-gradient(1100px 520px at 78% -8%, rgba(77, 227, 255, .17), transparent 62%),
+    radial-gradient(900px 520px at -12% 108%, rgba(150, 95, 255, .15), transparent 62%),
+    linear-gradient(180deg, var(--hud-bg2), var(--hud-bg) 55%);
+  padding: clamp(16px, 3.2vw, 40px); display: flex; flex-direction: column; gap: clamp(22px, 3.4vw, 40px); min-height: 100vh;
+}
+.pp::before { content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none;
+  background-image: linear-gradient(rgba(77, 227, 255, .055) 1px, transparent 1px), linear-gradient(90deg, rgba(77, 227, 255, .055) 1px, transparent 1px);
+  background-size: 44px 44px; }
+.pp::after { content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none;
+  background: repeating-linear-gradient(180deg, rgba(255, 255, 255, .022) 0 1px, transparent 1px 3px); }
+.pp h1, .pp h2, .pp h3, .pp p, .pp ol, .pp ul, .pp dl { margin: 0; }
+.pp a { color: var(--hud-cyan2); }
+
+/* En-tête */
+.hud-status { font-family: var(--hud-mono); font-size: 11px; letter-spacing: .18em; text-transform: uppercase; color: var(--hud-cyan); display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.hud-status b { font-weight: 500; color: var(--hud-text); }
+.hud-sep { color: var(--hud-line2); }
+.hud-pulse { width: 8px; height: 8px; border-radius: 50%; background: var(--hud-ok); box-shadow: 0 0 10px var(--hud-ok); display: inline-block; }
+.hud-title { margin-top: 10px !important; font-family: var(--font-anthropic-serif); font-weight: 400; font-size: clamp(30px, 5vw, 52px); line-height: 1.05; letter-spacing: .01em;
+  background: linear-gradient(90deg, #ffffff, var(--hud-cyan2) 45%, var(--hud-cyan)); -webkit-background-clip: text; background-clip: text; color: transparent;
+  text-shadow: 0 0 28px rgba(77, 227, 255, .25); }
+.hud-lede { margin-top: 12px !important; max-width: 76ch; color: var(--hud-muted); line-height: 1.55; font-size: var(--cds-font-size-body); }
+.hud-lede b { color: var(--hud-text); font-weight: 500; }
+.hud-caret { display: inline-block; width: 8px; height: 1.05em; vertical-align: -2px; margin-left: 4px; background: var(--hud-cyan); box-shadow: 0 0 8px var(--hud-cyan); }
+
+/* Titres de section */
+.hud-h { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.hud-h h2 { font-family: var(--hud-mono); font-weight: 500; font-size: 13px; letter-spacing: .22em; text-transform: uppercase; color: var(--hud-text); }
+.hud-idx { font-family: var(--hud-mono); font-size: 11px; color: var(--hud-bg); background: var(--hud-cyan); padding: 2px 6px; border-radius: 3px; box-shadow: 0 0 12px rgba(77, 227, 255, .6); }
+.hud-rule { flex: 1 1 60px; height: 1px; background: linear-gradient(90deg, var(--hud-line2), transparent); min-width: 40px; }
+.hud-h3 { font-family: var(--hud-mono); font-weight: 500; font-size: 11px; letter-spacing: .18em; text-transform: uppercase; color: var(--hud-cyan); margin-bottom: 8px !important; }
+.hud-h3-warn { color: var(--hud-warn); }
+.hud-note { color: var(--hud-muted); font-size: var(--cds-font-size-caption); line-height: 1.5; max-width: 80ch; }
+.hud-section { display: flex; flex-direction: column; gap: 12px; }
+
+/* Panneaux en verre */
+.hud-panel { position: relative; background: linear-gradient(160deg, var(--hud-panel2), var(--hud-panel)); border: 1px solid var(--hud-line); border-radius: 14px;
+  padding: clamp(14px, 2vw, 22px); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .05), 0 10px 40px rgba(0, 0, 0, .35); backdrop-filter: blur(6px); }
+.hud-panel::before, .hud-panel::after { content: ""; position: absolute; width: 14px; height: 14px; border: 2px solid var(--hud-cyan); opacity: .75; pointer-events: none; }
+.hud-panel::before { top: -1px; left: -1px; border-right: 0; border-bottom: 0; border-top-left-radius: 14px; }
+.hud-panel::after { bottom: -1px; right: -1px; border-left: 0; border-top: 0; border-bottom-right-radius: 14px; }
+
+/* Cœur et capsules */
+.hud-hero { display: grid; grid-template-columns: minmax(260px, 420px) 1fr; gap: clamp(16px, 2.4vw, 28px); align-items: center; }
+@media (max-width: 760px) { .hud-hero { grid-template-columns: 1fr; } }
+.hud-core { display: flex; flex-direction: column; align-items: center; gap: 12px; }
+.hud-reactor { width: 100%; max-width: 420px; min-height: 260px; position: relative; }
+.hud-arcs { list-style: none; padding: 0; display: flex; flex-wrap: wrap; justify-content: center; gap: 6px 16px; font-family: var(--hud-mono); font-size: 11px; color: var(--hud-muted); letter-spacing: .04em; }
+.hud-arcs li { display: inline-flex; align-items: center; gap: 6px; }
+.hud-arcs b { color: var(--hud-text); font-weight: 500; }
+.hud-tick { width: 14px; height: 3px; border-radius: 2px; display: inline-block; }
+.hud-tick-ok { background: var(--hud-ok); box-shadow: 0 0 8px var(--hud-ok); }
+.hud-tick-cyan { background: var(--hud-cyan); box-shadow: 0 0 8px var(--hud-cyan); }
+.hud-tick-violet { background: var(--hud-violet); box-shadow: 0 0 8px var(--hud-violet); }
+.hud-pods { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 14px; }
+.hud-pod { position: relative; overflow: hidden; }
+.hud-pod-label { font-family: var(--hud-mono); font-size: 10.5px; letter-spacing: .18em; text-transform: uppercase; color: var(--hud-muted); }
+.hud-pod-val { font-family: var(--hud-mono); font-size: clamp(26px, 3.4vw, 36px); line-height: 1.15; margin: 8px 0 6px; color: var(--hud-text); font-variant-numeric: tabular-nums; text-shadow: 0 0 18px rgba(77, 227, 255, .35); }
+.hud-pod-val.hud-pod-txt { font-family: var(--font-anthropic-sans); font-size: clamp(20px, 2.4vw, 26px); }
+.hud-pod-sub { font-size: var(--cds-font-size-caption); color: var(--hud-muted); line-height: 1.4; }
+.hud-pod-sub b { color: var(--hud-text); font-weight: 500; }
+.hud-pod-bar { position: absolute; left: 0; right: 0; bottom: 0; height: 2px; background: linear-gradient(90deg, transparent, var(--hud-cyan), transparent); opacity: .6; }
+
+/* Briefing */
+.hud-brief { display: flex; flex-direction: column; gap: 14px; }
+.hud-brief-title { font-size: clamp(17px, 2vw, 21px); line-height: 1.35; color: #ffffff; }
+.hud-brief-text { color: var(--hud-text); line-height: 1.6; max-width: 90ch; font-family: var(--hud-mono); font-size: 13px; }
+.hud-cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 18px; }
+.hud-list { list-style: none; padding: 0; display: flex; flex-direction: column; gap: 8px; counter-reset: arb; }
+.hud-list li { position: relative; padding: 9px 12px 9px 40px; border: 1px solid var(--hud-line); border-radius: 10px; background: rgba(77, 227, 255, .04); line-height: 1.5; font-size: var(--cds-font-size-caption); }
+.hud-list li::before { counter-increment: arb; content: counter(arb, decimal-leading-zero); position: absolute; left: 10px; top: 9px; font-family: var(--hud-mono); font-size: 11px; color: var(--hud-cyan); }
+.hud-alert li { border-color: rgba(255, 190, 77, .3); background: rgba(255, 190, 77, .05); }
+.hud-alert li::before { content: "!"; color: var(--hud-warn); left: 16px; font-weight: 700; }
+
+/* Vues de la matrice */
+.hud-seg { display: inline-flex; border: 1px solid var(--hud-line2); border-radius: 999px; padding: 2px; margin-left: auto; }
+.hud-seg-b { appearance: none; border: 0; background: transparent; color: var(--hud-muted); font-family: var(--hud-mono); font-size: 11px; letter-spacing: .08em; padding: 5px 12px; border-radius: 999px; cursor: pointer; }
+.hud-seg-b[aria-pressed="true"] { background: rgba(77, 227, 255, .16); color: var(--hud-text); box-shadow: 0 0 14px rgba(77, 227, 255, .25) inset; }
+.hud-chart { position: relative; min-height: 120px; }
+.hud-chart-lg { min-height: 320px; }
+.hud-chart-holo { min-height: 340px; }
+.hud-chart svg { display: block; overflow: visible; }
+.hud-chart svg text { fill: var(--hud-muted); font-family: var(--hud-mono); font-size: 11px; }
+.hud-chart svg .pp-lbl { fill: var(--hud-text); }
+.hud-chart svg .pp-quad { fill: var(--hud-cyan); opacity: .55; letter-spacing: .12em; text-transform: uppercase; font-size: 10px; }
+.hud-holo-wrap canvas { display: block; width: 100%; cursor: grab; touch-action: pan-y; }
+.hud-holo-wrap canvas:active { cursor: grabbing; }
+.hud-holo-msg { position: absolute; inset: 0; display: grid; place-items: center; font-family: var(--hud-mono); font-size: 12px; color: var(--hud-muted); pointer-events: none; }
+.hud-legend { display: flex; flex-wrap: wrap; gap: 8px 18px; font-family: var(--hud-mono); font-size: 11px; color: var(--hud-muted); letter-spacing: .04em; }
+.hud-legend span { display: inline-flex; align-items: center; gap: 7px; }
+.hud-dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; flex: none; background: var(--hud-pause); }
+.hud-dot[data-reco="Accélérer"] { background: var(--hud-ok); box-shadow: 0 0 8px var(--hud-ok); }
+.hud-dot[data-reco="Maintenir"] { background: var(--hud-cyan); box-shadow: 0 0 8px var(--hud-cyan); }
+.hud-dot[data-reco="À arbitrer"] { background: var(--hud-warn); box-shadow: 0 0 8px var(--hud-warn); }
+.hud-dot[data-reco="Mettre en pause"] { background: var(--hud-pause); box-shadow: 0 0 8px var(--hud-pause); }
+.hud-dot[data-reco="Arrêter"] { background: var(--hud-bad); box-shadow: 0 0 8px var(--hud-bad); }
+
+/* Infobulle */
+.pp-tip { position: absolute; pointer-events: none; z-index: 20; background: rgba(3, 14, 26, .94); border: 1px solid var(--hud-line2); box-shadow: 0 0 24px rgba(77, 227, 255, .25); border-radius: 8px;
+  padding: 8px 11px; font-family: var(--hud-mono); font-size: 11px; line-height: 1.55; max-width: 280px; color: var(--hud-text); }
+.pp-tip b { font-family: var(--font-anthropic-sans); font-size: 13px; font-weight: 500; color: #ffffff; display: block; margin-bottom: 2px; }
+.pp-tip span { display: block; color: var(--hud-muted); }
+
+/* Revenus */
+.hud-rows { display: flex; flex-direction: column; gap: 10px; }
+.hud-rowbar { display: grid; grid-template-columns: minmax(96px, 26%) 1fr minmax(70px, auto); align-items: center; gap: 12px; font-family: var(--hud-mono); font-size: 12px; }
+.hud-track { position: relative; height: 8px; border-radius: 4px; background: rgba(77, 227, 255, .08); border: 1px solid var(--hud-line); overflow: hidden; }
+.hud-track > i { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 4px; background: linear-gradient(90deg, var(--hud-cyan), var(--hud-ok)); box-shadow: 0 0 12px var(--hud-cyan); }
+.hud-track > em { position: absolute; top: -2px; bottom: -2px; width: 2px; background: var(--hud-warn); box-shadow: 0 0 8px var(--hud-warn); }
+.hud-track::after { content: ""; position: absolute; inset: 0; background: linear-gradient(90deg, transparent, rgba(155, 239, 255, .22), transparent); transform: translateX(-100%); animation-delay: var(--d, 0s); }
+.hud-num { font-variant-numeric: tabular-nums; text-align: right; color: var(--hud-text); }
+.hud-flat { position: relative; height: 70px; border: 1px dashed var(--hud-line2); border-radius: 10px; display: grid; place-items: center; overflow: hidden;
+  font-family: var(--hud-mono); font-size: 11px; letter-spacing: .16em; text-transform: uppercase; color: var(--hud-muted); }
+.hud-flat::before { content: ""; position: absolute; left: 0; right: 0; top: 50%; height: 1px; background: var(--hud-line2); }
+.hud-flat span { position: relative; background: var(--hud-bg); padding: 0 10px; }
+.hud-flat i { position: absolute; top: calc(50% - 3px); left: 0; width: 6px; height: 6px; border-radius: 50%; background: var(--hud-cyan); box-shadow: 0 0 12px 3px var(--hud-cyan); }
+
+/* Fiches projets */
+.hud-head2 { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+.hud-controls { display: flex; flex-wrap: wrap; gap: 14px; margin-left: auto; font-family: var(--hud-mono); font-size: 11px; color: var(--hud-muted); letter-spacing: .06em; }
+.hud-controls label { display: inline-flex; align-items: center; gap: 8px; }
+.pp .dash-select { background-color: rgba(9, 30, 50, .85); color: var(--hud-text); border: 1px solid var(--hud-line2); border-radius: 8px; }
+.hud-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)); gap: 16px; perspective: 1200px; }
+.hud-card { --c: var(--hud-cyan); position: relative; display: flex; flex-direction: column; gap: 10px; padding: 16px; border-radius: 14px; font-size: var(--cds-font-size-caption); line-height: 1.5;
+  background: radial-gradient(420px 160px at var(--mx, 70%) var(--my, 0%), color-mix(in srgb, var(--c) 16%, transparent), transparent 70%), linear-gradient(165deg, rgba(14, 44, 72, .66), rgba(6, 20, 36, .72));
+  border: 1px solid color-mix(in srgb, var(--c) 38%, transparent); box-shadow: 0 0 0 1px rgba(255, 255, 255, .02) inset, 0 12px 36px rgba(0, 0, 0, .4), 0 0 26px color-mix(in srgb, var(--c) 12%, transparent);
+  transform-style: preserve-3d; will-change: transform; transition: transform .25s ease-out, box-shadow .25s; }
+.hud-card:hover { box-shadow: 0 0 0 1px rgba(255, 255, 255, .04) inset, 0 18px 48px rgba(0, 0, 0, .5), 0 0 38px color-mix(in srgb, var(--c) 28%, transparent); }
+.hud-card-top { display: flex; justify-content: space-between; gap: 10px; align-items: baseline; }
+.hud-card h3 { font-size: 15px; font-weight: 500; color: #ffffff; }
+.hud-tag { font-family: var(--hud-mono); font-size: 10px; letter-spacing: .14em; text-transform: uppercase; color: var(--hud-muted); white-space: nowrap; }
+.hud-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.hud-chip { display: inline-flex; align-items: center; gap: 6px; padding: 2px 9px; border-radius: 999px; border: 1px solid var(--hud-line2); font-family: var(--hud-mono); font-size: 10.5px; letter-spacing: .04em; white-space: nowrap; color: var(--hud-text); }
+.hud-chip-reco { border-color: var(--c); color: var(--c); background: color-mix(in srgb, var(--c) 10%, transparent); box-shadow: 0 0 12px color-mix(in srgb, var(--c) 30%, transparent); }
+.hud-chip i { width: 7px; height: 7px; border-radius: 50%; display: inline-block; }
+.hud-prog { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 10px; }
+.hud-segs { display: grid; grid-template-columns: repeat(20, 1fr); gap: 2px; height: 9px; }
+.hud-segs i { border-radius: 1px; background: rgba(77, 227, 255, .1); }
+.hud-segs i.on { background: var(--c); box-shadow: 0 0 6px var(--c); }
+.hud-pct { font-family: var(--hud-mono); font-size: 13px; color: #ffffff; font-variant-numeric: tabular-nums; }
+.hud-kv { display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; }
+.hud-kv dt { font-family: var(--hud-mono); font-size: 10px; letter-spacing: .1em; text-transform: uppercase; color: var(--hud-muted); padding-top: 2px; }
+.hud-kv dd { margin: 0; color: var(--hud-text); }
+.hud-pips { display: inline-flex; gap: 3px; vertical-align: middle; margin-right: 6px; }
+.hud-pips i { width: 10px; height: 4px; border-radius: 1px; background: rgba(77, 227, 255, .14); }
+.hud-pips i.on { background: var(--hud-cyan); box-shadow: 0 0 5px var(--hud-cyan); }
+.hud-pips.hud-pips-effort i.on { background: var(--hud-violet); box-shadow: 0 0 5px var(--hud-violet); }
+.hud-blk { color: var(--hud-warn); }
+.hud-card details summary { cursor: pointer; font-family: var(--hud-mono); font-size: 10.5px; letter-spacing: .14em; text-transform: uppercase; color: var(--hud-cyan); }
+.hud-card details[open] summary { margin-bottom: 8px; }
+.hud-empty { color: var(--hud-muted); font-family: var(--hud-mono); font-size: 12px; padding: 16px 0; }
+
+/* Définitions */
+.hud-defs summary { cursor: pointer; font-family: var(--hud-mono); font-size: 12px; letter-spacing: .16em; text-transform: uppercase; color: var(--hud-cyan); }
+.hud-defs dl { margin-top: 12px !important; display: grid; grid-template-columns: minmax(120px, auto) 1fr; gap: 8px 18px; font-size: var(--cds-font-size-caption); line-height: 1.5; }
+.hud-defs dt { font-family: var(--hud-mono); font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--hud-text); }
+.hud-defs dd { margin: 0; color: var(--hud-muted); }
+
+.pp [data-dash-source-state=refreshing] { opacity: .5; }
+
+/* Animations (seulement si le lecteur les accepte) */
+@media (prefers-reduced-motion: no-preference) {
+  .pp::before { animation: hud-grid 26s linear infinite; }
+  .hud-pulse { animation: hud-blink 1.6s ease-in-out infinite; }
+  .hud-caret { animation: hud-caret 1.05s steps(1) infinite; }
+  .hud-spin { animation: hud-spin 46s linear infinite; transform-box: fill-box; transform-origin: center; }
+  .hud-spin-rev { animation: hud-spin 70s linear infinite reverse; transform-box: fill-box; transform-origin: center; }
+  .hud-spin-fast { animation: hud-spin 12s linear infinite; transform-box: fill-box; transform-origin: center; }
+  .hud-breathe { animation: hud-breathe 4.2s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
+  .hud-pod-bar { animation: hud-sweep 5s ease-in-out infinite; }
+  .hud-track::after { animation: hud-shimmer 3.4s ease-in-out var(--d, 0s) infinite; }
+  .hud-flat i { animation: hud-travel 3.8s linear infinite; }
+  .hud-in { animation: hud-in .7s cubic-bezier(.2, .8, .2, 1) both; }
+  .hud-segs i.on { animation: hud-seg .5s ease-out both; }
+  .hud-glowdot { animation: hud-blink 2.2s ease-in-out infinite; }
+}
+@keyframes hud-grid { to { background-position: 0 44px, 44px 0; } }
+@keyframes hud-blink { 0%, 100% { opacity: 1; } 50% { opacity: .35; } }
+@keyframes hud-caret { 50% { opacity: 0; } }
+@keyframes hud-spin { to { transform: rotate(360deg); } }
+@keyframes hud-breathe { 0%, 100% { transform: scale(1); opacity: .9; } 50% { transform: scale(1.06); opacity: 1; } }
+@keyframes hud-sweep { 0%, 100% { transform: translateX(-60%); } 50% { transform: translateX(60%); } }
+@keyframes hud-shimmer { 0% { transform: translateX(-100%); } 60%, 100% { transform: translateX(100%); } }
+@keyframes hud-travel { from { left: 0; } to { left: calc(100% - 6px); } }
+@keyframes hud-in { from { opacity: 0; transform: translateY(14px) rotateX(8deg); } to { opacity: 1; transform: none; } }
+@keyframes hud-seg { from { opacity: 0; } to { opacity: 1; } }
+</style>
+</head>
+<body class="verrouille">
+<div id="dash-root">
+<div id="acces" class="acces" role="dialog" aria-modal="true" aria-labelledby="acces-titre">
+  <div class="acces-anneaux" aria-hidden="true"><i></i><i></i><i></i></div>
+  <form id="acces-form" class="acces-boite">
+    <div class="acces-statut"><i class="hud-pulse"></i>Accès restreint</div>
+    <h1 id="acces-titre" class="acces-titre">Pilotage des projets</h1>
+    <input type="text" name="username" value="pilotage" autocomplete="username" hidden>
+    <label class="acces-label" for="acces-mdp">Mot de passe</label>
+    <input id="acces-mdp" name="password" type="password" autocomplete="current-password" required>
+    <label class="acces-memo"><input id="acces-memo" type="checkbox"> Se souvenir sur cet appareil</label>
+    <button id="acces-btn" type="submit">Déverrouiller</button>
+    <p id="acces-msg" class="acces-msg" aria-live="polite"></p>
+  </form>
+</div>
+<div class="pp" lang="fr">
+  <header id="entete">
+    <div class="hud-status"><i class="hud-pulse"></i>Système de pilotage · en ligne<span class="hud-sep">//</span>Rapport du <b data-draw="date-rapport" class="dash-skeleton" data-source="syntheses" data-field="date" data-row="0">—</b><span class="hud-sep">//</span>Publié le <b id="publie-le">—</b><button id="verrouiller" class="hud-lock" type="button">Verrouiller</button></div>
+    <h1 class="hud-title">Pilotage des projets</h1>
+    <p class="hud-lede">
+      <span data-lede="zero">Aucun projet ne génère encore de revenu.</span>
+      <span data-lede="some" hidden>Projets qui génèrent du revenu : <b data-draw="lede-nbrev" data-source="kpi" data-field="nb_avec_revenu" data-row="0">—</b>, pour <b data-draw="lede-total" data-source="kpi" data-field="total" data-row="0">—</b> encaissés au total.</span>
+      Décisions en attente : <b data-draw="lede-dec" class="dash-skeleton" data-source="kpi" data-field="nb_a_decider" data-row="0">—</b>.<span data-draw="lede-switch"></span><i class="hud-caret"></i>
+    </p>
+  </header>
+
+  <section class="hud-hero" id="indicateurs">
+    <div class="hud-core">
+      <div class="hud-reactor" id="reacteur" data-draw="reacteur" data-source="kpi"></div>
+      <ul class="hud-arcs" id="legende-reacteur">
+        <li><i class="hud-tick hud-tick-ok"></i>Projets qui rapportent <b><span data-draw="k-nbrev" class="dash-skeleton" data-source="kpi" data-field="nb_avec_revenu" data-row="0">—</span> / <span data-draw="k-nb" class="dash-skeleton" data-source="kpi" data-field="nb_projets" data-row="0">—</span></b></li>
+        <li><i class="hud-tick hud-tick-cyan"></i>Avancement moyen <b data-draw="k-avmoy" class="dash-skeleton" data-source="kpi" data-field="avancement_moyen" data-row="0">—</b></li>
+        <li><i class="hud-tick hud-tick-violet"></i>Décisions prises <b><span data-draw="k-decides" class="dash-skeleton" data-source="kpi" data-field="nb_decides" data-row="0">—</span> / <span data-draw="k-nb" class="dash-skeleton" data-source="kpi" data-field="nb_projets" data-row="0">—</span></b></li>
+      </ul>
+    </div>
+    <div class="hud-pods">
+      <div class="hud-panel hud-pod" id="kpi-30j">
+        <div class="hud-pod-label">Revenu · 30 derniers jours</div>
+        <div class="hud-pod-val dash-skeleton" data-draw="k-30j" data-source="kpi" data-field="total_30j" data-row="0">—</div>
+        <div class="hud-pod-sub" data-draw="k-30j-delta">—</div>
+        <i class="hud-pod-bar"></i>
+      </div>
+      <div class="hud-panel hud-pod" id="kpi-proche">
+        <div class="hud-pod-label">Le plus proche du premier euro</div>
+        <div class="hud-pod-val hud-pod-txt dash-skeleton" data-draw="lede-proche" data-source="kpi" data-field="proche_projet" data-row="0">—</div>
+        <div class="hud-pod-sub">Avancement : <b data-draw="lede-proche-av" class="dash-skeleton" data-source="kpi" data-field="proche_avancement" data-row="0">—</b></div>
+        <i class="hud-pod-bar"></i>
+      </div>
+      <div class="hud-panel hud-pod" id="kpi-decisions">
+        <div class="hud-pod-label">Décisions en attente</div>
+        <div class="hud-pod-val dash-skeleton" data-draw="k-dec" data-source="kpi" data-field="nb_a_decider" data-row="0">—</div>
+        <div class="hud-pod-sub">Projets sans décision de ta part</div>
+        <i class="hud-pod-bar"></i>
+      </div>
+      <div class="hud-panel hud-pod" id="kpi-automatisations">
+        <div class="hud-pod-label">Automatisations actives</div>
+        <div class="hud-pod-val dash-skeleton" data-draw="k-auto" data-source="kpi" data-field="nb_automatisations" data-row="0">—</div>
+        <div class="hud-pod-sub">Tâches planifiées qui travaillent sur tes projets</div>
+        <i class="hud-pod-bar"></i>
+      </div>
+    </div>
+  </section>
+
+  <section class="hud-panel hud-brief" id="synthese">
+    <div class="hud-h"><span class="hud-idx">01</span><h2>Briefing du jour</h2><i class="hud-rule"></i></div>
+    <p class="hud-brief-title dash-skeleton" data-draw="s-titre" data-source="syntheses" data-field="titre" data-row="0">—</p>
+    <p class="hud-brief-text dash-skeleton" data-draw="s-texte" data-source="syntheses" data-field="synthese" data-row="0">—</p>
+    <div class="hud-cols">
+      <div id="arbitrages-proposes">
+        <h3 class="hud-h3">Arbitrages proposés par Claude</h3>
+        <ol class="hud-list" data-draw="s-arbitrages" data-source="syntheses" data-field="arbitrages" data-row="0"></ol>
+      </div>
+      <div id="points-attention">
+        <h3 class="hud-h3 hud-h3-warn">Points d'attention</h3>
+        <ul class="hud-list hud-alert" data-draw="s-alertes" data-source="syntheses" data-field="alertes" data-row="0"></ul>
+      </div>
+    </div>
+  </section>
+
+  <section class="hud-section" id="arbitrage">
+    <div class="hud-h"><span class="hud-idx">02</span><h2>Matrice d'arbitrage</h2><i class="hud-rule"></i>
+      <div class="hud-seg" role="group" aria-label="Choix de la vue">
+        <button type="button" class="hud-seg-b" data-vue="holo" aria-pressed="true">Hologramme 3D</button>
+        <button type="button" class="hud-seg-b" data-vue="plan" aria-pressed="false">Vue plane</button>
+      </div>
+    </div>
+    <p class="hud-note">Chaque colonne lumineuse est un projet. Au sol : l'avancement vers le premier euro (de gauche à droite) et l'effort restant (de l'avant vers le fond). En hauteur : le potentiel de revenu à 12 mois. La couleur suit la recommandation du jour. Fais glisser l'hologramme pour le tourner, survole une colonne pour le détail.</p>
+    <div class="hud-panel" data-vue-panel="holo">
+      <div class="hud-chart hud-chart-holo" id="hologramme" data-draw="holo" data-source="projets revenu_par_projet"></div>
+    </div>
+    <div class="hud-panel" data-vue-panel="plan" hidden>
+      <div class="hud-chart hud-chart-lg" id="matrice" data-draw="matrice" data-source="projets revenu_par_projet"></div>
+    </div>
+    <div class="hud-legend" id="legende-recommandations">
+      <span><i class="hud-dot" data-reco="Accélérer"></i>Accélérer</span>
+      <span><i class="hud-dot" data-reco="Maintenir"></i>Maintenir</span>
+      <span><i class="hud-dot" data-reco="À arbitrer"></i>À arbitrer</span>
+      <span><i class="hud-dot" data-reco="Mettre en pause"></i>Mettre en pause</span>
+      <span><i class="hud-dot" data-reco="Arrêter"></i>Arrêter</span>
+    </div>
+  </section>
+
+  <section class="hud-section" id="revenus">
+    <div class="hud-h"><span class="hud-idx">03</span><h2>Flux de revenus</h2><i class="hud-rule"></i></div>
+    <p class="hud-note">Cumul des encaissements enregistrés par projet. Le trait orange marque ton objectif mensuel quand tu en fixes un.</p>
+    <div class="hud-panel"><div class="hud-chart" id="revenus-projets" data-draw="rev-projets" data-source="revenu_par_projet"></div></div>
+    <h3 class="hud-h3">Encaissements par mois</h3>
+    <div class="hud-chart" id="revenus-mois" data-draw="rev-mois" data-source="revenu_mensuel"></div>
+    <p class="hud-note">Pour enregistrer un encaissement, dis-le à Claude, ou ajoute une ligne au fichier « Journal des revenus » dans Sources : date (AAAA-MM-JJ), projet_id, projet, montant en euros, type, note.</p>
+  </section>
+
+  <section class="hud-section" id="projets">
+    <div class="hud-head2">
+      <div class="hud-h" style="flex:1 1 280px"><span class="hud-idx">04</span><h2>Projets</h2><i class="hud-rule"></i></div>
+      <div class="hud-controls">
+        <label>Pôle <select class="dash-select" data-draw="filtre-pole" aria-label="Filtrer par pôle"></select></label>
+        <label>Tri <select class="dash-select pp-tri" aria-label="Trier les projets">
+          <option value="potentiel">Potentiel</option>
+          <option value="avancement">Avancement</option>
+          <option value="revenu">Revenu</option>
+          <option value="activite">Dernière activité</option>
+        </select></label>
+      </div>
+    </div>
+    <div class="hud-grid" id="fiches-projets" data-draw="cartes" data-source="projets rapports revenu_par_projet"></div>
+  </section>
+
+  <section class="hud-section" id="evolution">
+    <div class="hud-h"><span class="hud-idx">05</span><h2>Trajectoires</h2><i class="hud-rule"></i></div>
+    <p class="hud-note">L'avancement de chaque projet, rapport après rapport. Une ligne s'ajoute chaque matin.</p>
+    <div class="hud-panel"><div class="hud-chart hud-chart-lg" id="courbe-avancement" data-draw="evolution" data-source="rapports"></div></div>
+  </section>
+
+  <details class="hud-panel hud-defs" id="definitions">
+    <summary>Comment lire ce tableau</summary>
+    <dl>
+      <dt>Avancement</dt><dd>De 0 à 100 %, vers le premier revenu récurrent. Idée : 0 à 10. Conception : 10 à 30. Construction : 30 à 50. Lancé, sans revenu : 50 à 70. Premiers revenus : 70 à 90. Rentable : 90 à 100.</dd>
+      <dt>Potentiel</dt><dd>De 1 à 5 : le revenu que le projet peut raisonnablement produire dans les 12 mois. Estimation de Claude, que tu peux corriger.</dd>
+      <dt>Effort restant</dt><dd>De 1 à 5 : le travail et l'argent à engager avant le premier revenu.</dd>
+      <dt>Recommandation</dt><dd>Proposée par Claude à chaque rapport, à partir de l'activité constatée, du revenu et des blocages. « À arbitrer » signale un choix qui t'appartient.</dd>
+      <dt>Décision</dt><dd>La tienne. Claude ne la modifie jamais ; dis-lui ce que tu décides et il l'enregistre.</dd>
+      <dt>Revenus</dt><dd>Uniquement les encaissements du journal des revenus, en euros. Aucun montant estimé.</dd>
+      <dt>Accès</dt><dd>Les données sont chiffrées (AES-256) et ne se lisent qu'avec le mot de passe, directement dans ton navigateur. « Verrouiller » efface le mot de passe mémorisé sur cet appareil.</dd>
+      <dt>Animations</dt><dd>Elles s'arrêtent si ton système demande de réduire les animations.</dd>
+    </dl>
+  </details>
+</div>
+</div>
+<script src="vendor/d3.min.js"></script>
+<script src="dash-shim.js"></script>
+<script src="app.js"></script>
+<script src="acces.js"></script>
+</body>
+</html>
