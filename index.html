@@ -322,6 +322,9 @@ body.verrouille { overflow: hidden; height: 100vh; }
 .ia-msg-ia { position: relative; align-self: flex-start; background: rgba(255,255,255,.035); border: 1px solid var(--ia-l); border-bottom-left-radius: 4px; padding-left: 14px; }
 .ia-msg-ia::before { content: ""; position: absolute; left: 0; top: 10px; bottom: 10px; width: 2px; border-radius: 2px; background: linear-gradient(180deg, var(--ia-c), var(--ia-v)); box-shadow: 0 0 8px rgba(77,227,255,.6); }
 .ia-msg-erreur { border-color: rgba(255,79,110,.4); background: rgba(255,79,110,.06); color: #ffd0d8; }
+.ia-msg-info { border-color: rgba(255,190,77,.4); background: rgba(255,190,77,.06); color: #ffe2b0; }
+.ia-msg-info::before { background: #ffbe4d; box-shadow: 0 0 8px rgba(255,190,77,.6); }
+.ia-msg-info .ia-qui { color: #ffbe4d; }
 .ia-msg-erreur::before { background: var(--ia-ko); box-shadow: 0 0 8px rgba(255,79,110,.6); }
 .ia-msg-erreur .ia-qui { color: #ff8fa3; }
 .ia-qui { display: flex; align-items: center; gap: 6px; margin-bottom: 3px; font-family: var(--ia-mono); font-size: 9.5px; letter-spacing: .2em; text-transform: uppercase; color: var(--ia-c); }
@@ -565,10 +568,10 @@ body.verrouille { overflow: hidden; height: 100vh; }
   </section>
 </div>
 <script src="vendor/d3.min.js"></script>
-<script src="dash-shim.js?v=20261109b"></script>
-<script src="app.js?v=20261109b"></script>
-<script src="config.js?v=20261109b"></script>
-<script src="assistant.js?v=20261109b"></script>
-<script src="acces.js?v=20261109b"></script>
+<script src="dash-shim.js?v=20261109c"></script>
+<script src="app.js?v=20261109c"></script>
+<script src="config.js?v=20261109c"></script>
+<script src="assistant.js?v=20261109c"></script>
+<script src="acces.js?v=20261109c"></script>
 </body>
 </html>

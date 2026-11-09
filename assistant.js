@@ -27,7 +27,7 @@
   let historique = [], enCours = false, salue = false, sonde = false;
   const synth = 'speechSynthesis' in window && 'SpeechSynthesisUtterance' in window ? window.speechSynthesis : null;
   let voixActive = !!synth && CFG.voix !== false && lire(CLE_VOIX) !== '0';
-  let voixChoisie = null, voixDebloquee = false;
+  let voixChoisie = null, voixDebloquee = false, veille = 0, panneSignalee = false;
 
   $('ia-nom').textContent = NOM;
   orbe.setAttribute('aria-label', 'Ouvrir ' + NOM + ', l’assistante');
@@ -140,31 +140,46 @@
   }
 
   function taire() {
+    clearTimeout(veille);
     if (synth) { try { synth.cancel(); } catch (e) { /* rien */ } }
     racine.classList.remove('ia-parle');
   }
 
+  // Certains navigateurs (dont le navigateur intégré de l'app Claude) acceptent la demande
+  // mais ne parlent jamais : sans début de lecture après quelques secondes, on prévient.
   function parler(texte) {
     if (!synth || !voixActive) return;
     taire();
     const morceaux = decouper(pourLaVoix(texte));
+    if (!morceaux.length) return;
+    let demarre = false;
     morceaux.forEach((m, i) => {
       const u = new SpeechSynthesisUtterance(m);
       u.lang = voixChoisie ? voixChoisie.lang : 'fr-FR';
       if (voixChoisie) u.voice = voixChoisie;
       u.rate = 1.03;
       u.pitch = 1;
-      if (i === 0) u.onstart = () => racine.classList.add('ia-parle');
+      if (i === 0) u.onstart = () => { demarre = true; clearTimeout(veille); racine.classList.add('ia-parle'); };
       if (i === morceaux.length - 1) u.onend = u.onerror = () => racine.classList.remove('ia-parle');
       synth.speak(u);
     });
+    clearTimeout(veille);
+    veille = setTimeout(() => {
+      if (demarre) return;
+      taire();
+      if (panneSignalee) return;
+      panneSignalee = true;
+      const { corps } = bulle('ia-msg-ia ia-msg-info', 'Voix');
+      corps.textContent = 'Ce navigateur ne lit pas la synthèse vocale. Ouvre le site dans Chrome, Safari ou Edge pour m\u2019entendre ; le texte reste disponible ici.';
+      defiler();
+    }, 3500);
   }
 
   // Safari et iOS n'autorisent la voix qu'après un geste : on la « réveille » au premier clic.
   function debloquerVoix() {
     if (!synth || !voixActive || voixDebloquee) return;
     voixDebloquee = true;
-    try { const u = new SpeechSynthesisUtterance(' '); u.volume = 0; synth.speak(u); } catch (e) { /* rien */ }
+    try { synth.cancel(); if (synth.resume) synth.resume(); const u = new SpeechSynthesisUtterance(''); u.volume = 0; synth.speak(u); } catch (e) { /* rien */ }
   }
 
   function majVoix() {
