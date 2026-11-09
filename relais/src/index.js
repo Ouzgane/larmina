@@ -45,7 +45,7 @@ export default {
     if (messages.some((m) => m.content.length > LIMITES.message)) return json({ erreur: `Un message dépasse ${LIMITES.message} caractères.` }, 413, cors);
 
     const contexte = typeof corps.contexte === 'string' ? corps.contexte.slice(0, LIMITES.contexte) : '';
-    const nom = typeof corps.nom === 'string' && /^[\p{L}][\p{L}\p{N} .'-]{0,23}$/u.test(corps.nom.trim()) ? corps.nom.trim() : 'Larmina';
+    const nom = typeof corps.nom === 'string' && /^[\p{L}][\p{L}\p{N} .'-]{0,23}$/u.test(corps.nom.trim()) ? corps.nom.trim() : 'Geri';
     const date = new Date().toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', timeZone: 'Europe/Paris' });
 
     let cfg;

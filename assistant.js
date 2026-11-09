@@ -2,9 +2,11 @@
 // Il n'utilise jamais le micro et n'écoute pas. La voix est celle du navigateur (synthèse vocale locale).
 // Le modèle est derrière le relais (relais/) : changer de modèle ne touche pas à ce fichier.
 (function () {
-  const CFG = Object.assign({ relais: '', nom: 'Larmina', voix: true }, window.PILOTAGE_IA || {});
+  const CFG = Object.assign({ relais: '', nom: 'Geri', prononciation: '', voixNom: '', voix: true }, window.PILOTAGE_IA || {});
   const RELAIS = String(CFG.relais || '').trim().replace(/\/+$/, '');
-  const NOM = String(CFG.nom || 'Larmina');
+  const NOM = String(CFG.nom || 'Geri');
+  const NOM_PRONONCE = String(CFG.prononciation || '').trim();
+  const echapper = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   const CLE_VOIX = 'pilotage.voix';
   const SEL_JETON = 'pilotage-ia-jeton-v1';
   const HISTORIQUE = 12;
@@ -89,12 +91,19 @@
   }
 
   // ── Voix ─────────────────────────────────────────────────────────────────────
+  // Voix féminine : les navigateurs n'indiquent pas le genre, on le déduit du nom de la voix.
+  const FEMMES = /audrey|aur[ée]lie|marie|am[ée]lie|julie|denise|hortense|[ée]lo[iï]se|vivienne|brigitte|c[ée]leste|coralie|jacqueline|jos[ée]phine|yvette|charline|ariane|sylvie|chantal|caroline|virginie|fran[çc]oise|sophie|google fran[çc]ais/i;
+  const FEMMES_FANTAISIE = /\b(flo|shelley|sandy|grandma)\b/i;
+  const HOMMES = /thomas|jacques|eddy|grandpa|reed|rocko|henri|paul|r[ée]m[iy]|claude|daniel|nicolas|fabrice|g[ée]rard|alain|antoine|j[ée]r[ôo]me|maxime|yves|christophe|lucien|mathieu|guillaume|jean|louis|thierry|bruno|cl[ée]ment|f[ée]lix|hugo|lucas|olivier|pierre/i;
   function choisirVoix() {
     if (!synth) return;
     const fr = (synth.getVoices() || []).filter((v) => /^fr([-_]|$)/i.test(v.lang || ''));
-    const note = (v) => (/natural|neural|online|premium|enhanced|wavenet/i.test(v.name) ? 8 : 0) + (/google/i.test(v.name) ? 4 : 0)
-      + (/^fr[-_]fr/i.test(v.lang) ? 3 : 0) + (v.localService === false ? 1 : 0)
-      + (/thomas|henri|paul|r[ée]my|denise|am[ée]lie|audrey|aur[ée]lie|marie|julie|vivienne|eloise/i.test(v.name) ? 1 : 0);
+    const impose = String(CFG.voixNom || '').trim().toLowerCase();
+    const voulue = impose && fr.find((v) => v.name.toLowerCase().includes(impose));
+    if (voulue) { voixChoisie = voulue; return; }
+    const note = (v) => (HOMMES.test(v.name) ? -100 : FEMMES_FANTAISIE.test(v.name) ? 10 : FEMMES.test(v.name) ? 30 : 0)
+      + (/natural|neural|online|premium|enhanced|wavenet/i.test(v.name) ? 8 : 0)
+      + (/^fr[-_]fr/i.test(v.lang) ? 3 : 0) + (v.localService === false ? 1 : 0);
     voixChoisie = fr.sort((a, b) => note(b) - note(a))[0] || null;
   }
   if (synth) {
@@ -104,7 +113,9 @@
   }
 
   function pourLaVoix(t) {
-    return String(t || '')
+    let s = String(t || '');
+    if (NOM_PRONONCE) s = s.replace(new RegExp('(^|[^\\p{L}])' + echapper(NOM) + '(?![\\p{L}])', 'gu'), '$1' + NOM_PRONONCE);
+    return s
       .replace(/\*\*|__|[*_`#>]/g, '')
       .replace(/https?:\/\/\S+/g, '')
       .replace(/\b(\d{4})-(\d{2})-(\d{2})\b/g, (m, a, mo, j) => (MOIS[+mo - 1] ? `${+j} ${MOIS[+mo - 1]} ${a}` : m))
@@ -142,7 +153,7 @@
       u.lang = voixChoisie ? voixChoisie.lang : 'fr-FR';
       if (voixChoisie) u.voice = voixChoisie;
       u.rate = 1.03;
-      u.pitch = 0.95;
+      u.pitch = 1;
       if (i === 0) u.onstart = () => racine.classList.add('ia-parle');
       if (i === morceaux.length - 1) u.onend = u.onerror = () => racine.classList.remove('ia-parle');
       synth.speak(u);
@@ -301,7 +312,7 @@
     historique.push({ role: 'user', content: question });
     if (!RELAIS) {
       historique.pop();
-      ajouterErreur('Je ne suis pas encore branchée : le relais Cloudflare n’est pas déployé. Le README explique comment faire en quelques minutes.');
+      ajouterErreur('Mon relais Cloudflare n’est pas encore déployé : je ne peux pas répondre. Le README explique comment faire en quelques minutes.');
       return;
     }
     enCours = true;

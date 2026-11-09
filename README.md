@@ -1,6 +1,6 @@
 # Pilotage des projets
 
-Version en ligne du tableau de pilotage du portefeuille de projets : revenus, briefing du jour, matrice d'arbitrage en 3D, fiches projets et trajectoires. Un assistant, Larmina, répond aux questions sur le tableau, par écrit et à voix haute.
+Version en ligne du tableau de pilotage du portefeuille de projets : revenus, briefing du jour, matrice d'arbitrage en 3D, fiches projets et trajectoires. Une assistante, Geri (prononcé « Jéri »), répond aux questions sur le tableau, par écrit et à voix haute.
 
 ## Confidentialité
 
@@ -23,7 +23,7 @@ Pour changer de mot de passe : republier avec le nouveau, mettre à jour la tâc
 
 ## Assistant IA
 
-On écrit à l'assistant, il répond par écrit et à voix haute, et propose des relances à cliquer. Il n'utilise jamais le micro. La voix est la synthèse vocale du navigateur, elle ne coûte rien ; le bouton haut-parleur la coupe.
+On écrit à l'assistant, il répond par écrit et à voix haute, et propose des relances à cliquer. Il n'utilise jamais le micro. La voix est la synthèse vocale du navigateur, elle ne coûte rien ; le bouton haut-parleur la coupe. Une voix féminine française est choisie automatiquement parmi celles de l'appareil ; `voixNom` dans `config.js` en impose une. Sur Mac, la meilleure (Audrey ou Aurélie, en qualité Premium) s'installe dans Réglages Système → Accessibilité → Contenu énoncé → Voix du système → Gérer les voix.
 
 ```
 navigateur ──(question + résumé des données)──▶ relais Cloudflare ──▶ modèle
@@ -81,7 +81,7 @@ Si le mot de passe du site change : `PILOTAGE_MDP='…' node outils/empreinte-ia
 - `dash-shim.js` : fournit les données déchiffrées à `app.js`.
 - `acces.js` : téléchargement, déchiffrement et mémorisation du mot de passe.
 - `assistant.js` : le chat, la voix, les relances et le résumé des données envoyé au relais.
-- `config.js` : adresse du relais et nom de l'assistant.
+- `config.js` : adresse du relais, nom de l'assistante, sa prononciation et sa voix.
 - `relais/` : le relais IA (Cloudflare Worker) et ses tests.
 - `.github/workflows/relais.yml` : déploiement automatique du relais.
 - `vendor/d3.min.js` : D3 v7.9 (licence ISC).

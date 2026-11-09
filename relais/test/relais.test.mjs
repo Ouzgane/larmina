@@ -31,7 +31,7 @@ function requete(corps, { jeton = JETON, origine = ORIGINE, methode = 'POST', ch
   return new Request('https://larmina-ia.exemple.workers.dev' + chemin, { method: methode, headers: h, body: methode === 'POST' ? JSON.stringify(corps) : undefined });
 }
 
-const question = { messages: [{ role: 'user', content: 'Quel projet accélérer ?' }], contexte: 'PROJETS : KitVital…', nom: 'Larmina' };
+const question = { messages: [{ role: 'user', content: 'Quel projet accélérer ?' }], contexte: 'PROJETS : KitVital…', nom: 'Geri' };
 
 test('état du relais sans donnée', async () => {
   const { env } = envDe();
@@ -69,7 +69,7 @@ test('Cloudflare gpt-oss : format Responses, raisonnement ignoré, suggestions e
   assert.deepEqual(j.suggestions, ['Que faire cette semaine ?', 'Et Growth Hiring ?']);
   assert.equal(appels.length, 1);
   assert.equal(appels[0].modele, '@cf/openai/gpt-oss-120b');
-  assert.match(appels[0].entree.instructions, /Tu es Larmina/);
+  assert.match(appels[0].entree.instructions, /Tu es Geri/);
   assert.match(appels[0].entree.instructions, /PROJETS : KitVital/);
   assert.deepEqual(appels[0].entree.input, [{ role: 'user', content: 'Quel projet accélérer ?' }]);
 });
@@ -116,7 +116,7 @@ test('bascule vers Anthropic : une variable et une clé', async () => {
     assert.equal(vus[0].url, 'https://api.anthropic.com/v1/messages');
     assert.equal(vus[0].init.headers['x-api-key'], 'sk-ant-test');
     assert.equal(vus[0].corps.model, 'claude-haiku-5-5');
-    assert.match(vus[0].corps.system, /Tu es Larmina/);
+    assert.match(vus[0].corps.system, /Tu es Geri/);
     assert.equal(vus[0].corps.messages[0].role, 'user');
   });
 });
