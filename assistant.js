@@ -109,7 +109,8 @@
       .replace(/https?:\/\/\S+/g, '')
       .replace(/\b(\d{4})-(\d{2})-(\d{2})\b/g, (m, a, mo, j) => (MOIS[+mo - 1] ? `${+j} ${MOIS[+mo - 1]} ${a}` : m))
       .replace(/\b(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?\b/g, (m, j, mo, a) => (+mo >= 1 && +mo <= 12 && +j >= 1 && +j <= 31 ? `${+j} ${MOIS[+mo - 1]}${a ? ' ' + a : ''}` : m))
-      .replace(/(\d+(?:[.,]\d+)?)\s?k€/g, '$1 mille euros')
+      .replace(/~\s*/g, 'environ ')
+      .replace(/(\d+(?:[.,]\d+)?)[\s\u00a0\u202f]?k[\s\u00a0\u202f]?€/g, '$1 mille euros')
       .replace(/\s*[|•→·]\s*/g, ', ')
       .replace(/^\s*[-–]\s+/gm, '')
       .replace(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{FE0F}]/gu, '')
@@ -265,7 +266,7 @@
       const b = document.createElement('button');
       b.type = 'button';
       b.className = 'ia-puce' + (p.rejouer ? ' ia-puce-rejouer' : '');
-      b.textContent = p.libelle;
+      b.textContent = p.libelle.charAt(0).toUpperCase() + p.libelle.slice(1);
       b.addEventListener('click', () => demander(p.texte, { rejouer: !!p.rejouer }));
       zonePuces.appendChild(b);
     });
