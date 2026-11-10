@@ -480,6 +480,10 @@ body.verrouille { overflow: hidden; height: 100vh; }
 @keyframes ia-point { 0%, 80%, 100% { opacity: .25; transform: translateY(0); } 40% { opacity: 1; transform: translateY(-3px); } }
 @keyframes ia-curseur { 50% { opacity: 0; } }
 @keyframes ia-entree { from { opacity: 0; transform: translateY(8px); } }
+  .hud-synchro { margin-left: .9em; opacity: .75; }
+  .hud-synchro::before { content: "//"; margin-right: .9em; opacity: .5; }
+  .hud-synchro.hud-synchro-ok { color: #6ee7b7; }
+  .hud-synchro.hud-synchro-erreur { color: #fca5a5; }
 </style>
 </head>
 <body class="verrouille">
@@ -499,7 +503,7 @@ body.verrouille { overflow: hidden; height: 100vh; }
 </div>
 <div class="pp" lang="fr">
   <header id="entete">
-    <div class="hud-status"><i class="hud-pulse"></i>Système de pilotage · en ligne<span class="hud-sep">//</span>Rapport du <b data-draw="date-rapport" class="dash-skeleton" data-source="syntheses" data-field="date" data-row="0">—</b><span class="hud-sep">//</span>Publié le <b id="publie-le">—</b><button id="verrouiller" class="hud-lock" type="button">Verrouiller</button></div>
+    <div class="hud-status"><i class="hud-pulse"></i>Système de pilotage · en ligne<span class="hud-sep">//</span>Rapport du <b data-draw="date-rapport" class="dash-skeleton" data-source="syntheses" data-field="date" data-row="0">—</b><span class="hud-sep">//</span>Publié le <b id="publie-le">—</b><span id="notion-synchro" class="hud-synchro" hidden></span><button id="verrouiller" class="hud-lock" type="button">Verrouiller</button></div>
     <h1 class="ia-masque">Pilotage des projets</h1>
     <p class="hud-lede">
       <span data-lede="zero">Aucun projet ne génère encore de revenu.</span>
@@ -674,13 +678,13 @@ body.verrouille { overflow: hidden; height: 100vh; }
   </section>
 </div>
 <script src="vendor/d3.min.js"></script>
-<script src="dash-shim.js?v=20261110d"></script>
-<script src="app.js?v=20261110d"></script>
-<script src="config.js?v=20261110d"></script>
-<script src="geri.js?v=20261110d"></script>
-<script src="voix.js?v=20261110d"></script>
-<script src="musique.js?v=20261110d"></script>
-<script src="assistant.js?v=20261110d"></script>
-<script src="acces.js?v=20261110d"></script>
+<script src="dash-shim.js?v=20261110e"></script>
+<script src="app.js?v=20261110e"></script>
+<script src="config.js?v=20261110e"></script>
+<script src="geri.js?v=20261110e"></script>
+<script src="voix.js?v=20261110e"></script>
+<script src="musique.js?v=20261110e"></script>
+<script src="assistant.js?v=20261110e"></script>
+<script src="acces.js?v=20261110e"></script>
 </body>
 </html>

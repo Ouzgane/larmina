@@ -27,6 +27,7 @@
 
   let jeton = null, jetonPret = Promise.resolve(null), contexteTexte = '', donnees = null;
   let historique = [], enCours = false, salue = false, sonde = false;
+  let publieLe = 0, derniereSynchro = 0, synchroEnCours = null;
   const synth = 'speechSynthesis' in window && 'SpeechSynthesisUtterance' in window ? window.speechSynthesis : null;
   let voixActive = !!synth && CFG.voix !== false && lire(CLE_VOIX) !== '0';
   let voixChoisie = null, voixDebloquee = false, veille = 0, panneSignalee = false;
@@ -494,6 +495,7 @@
         Object.assign(p, action.champs);
         contexteTexte = construireContexte(donnees);
         if (window.PILOTAGE && window.PILOTAGE.charger) window.PILOTAGE.charger(donnees);
+        synchroniserNotion(true);
         boutons.replaceChildren();
         const fait = document.createElement('span');
         fait.className = 'ia-action-ok-txt';
@@ -663,18 +665,100 @@
   champ.addEventListener('input', ajuster);
   majVoix();
 
+  // Synchronisation avec Notion : le site reprend les décisions et les mises à jour
+  // dès qu'elles y sont, qu'elles viennent de Geri ou d'une modification faite dans Notion.
+  const normNom = (t) => String(t || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, ' ').trim();
+  const CHAMPS_NOTION = ['prochaine_etape', 'echeance', 'blocages', 'resume', 'avancement', 'etape', 'dynamique', 'recommandation',
+    'potentiel', 'effort', 'automatisations', 'derniere_activite', 'modele_revenu', 'pole'];
+  const TEXTES_NOTION = new Set(['prochaine_etape', 'blocages', 'resume']);
+  function appliquerNotion(fiches) {
+    const projets = donnees.projets;
+    const parNom = new Map(projets.map((p) => [normNom(p.projet), p]));
+    let change = false;
+    for (const f of fiches) {
+      if (!f || !f.nom) continue;
+      let p = parNom.get(normNom(f.nom));
+      if (!p) {
+        // Projet ajouté dans Notion depuis le dernier rapport : il apparaît tout de suite.
+        const base = normNom(f.nom).replace(/ /g, '-').slice(0, 40) || 'projet';
+        let id = base, n = 2;
+        while (projets.some((q) => q.id === id)) id = base + '-' + n++;
+        p = { id, projet: f.nom, nom_court: f.nom.length > 22 ? f.nom.slice(0, 21) + '…' : f.nom, decision: 'À décider', statut: null, recommandation: 'À arbitrer',
+          etape: 'Idée', avancement: 0, dynamique: 'Stable', potentiel: 1, effort: 3, objectif_mensuel: null, resume: '', modele_revenu: '', prochaine_etape: '',
+          echeance: null, blocages: '', derniere_activite: null, automatisations: 0, lien: f.lien || f.url || null, lien_libelle: f.lien ? 'Source' : 'Fiche Notion', pole: f.pole || null };
+        projets.push(p);
+        parNom.set(normNom(f.nom), p);
+        change = true;
+      }
+      // Décision, statut et objectif : toujours ceux de Notion (« À décider » si la décision est vide).
+      const maj = { decision: f.decision || 'À décider', statut: f.statut || null, objectif_mensuel: typeof f.objectif_mensuel === 'number' ? f.objectif_mensuel : null };
+      // Le reste : ce qu'il y a dans Notion si la fiche a été modifiée après la publication du rapport
+      // (par toi, par Geri ou par le rapport du matin).
+      if ((Date.parse(f.modifie_le || '') || 0) > publieLe) {
+        for (const k of CHAMPS_NOTION) {
+          if (TEXTES_NOTION.has(k)) maj[k] = f[k] || '';
+          else if (k === 'echeance') maj[k] = f[k] || null;
+          else if (f[k] !== null && f[k] !== undefined && f[k] !== '') maj[k] = f[k];
+        }
+      }
+      for (const [k, v] of Object.entries(maj)) if (p[k] !== v) { p[k] = v; change = true; }
+    }
+    return change;
+  }
+  function indiquerSynchro(etat) {
+    const el = document.getElementById('notion-synchro');
+    if (!el) return;
+    if (!etat) { el.hidden = true; return; }
+    el.hidden = false;
+    el.className = 'hud-synchro hud-synchro-' + etat;
+    el.textContent = etat === 'ok'
+      ? 'Notion à jour à ' + new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
+      : 'Notion injoignable : décisions du rapport';
+  }
+  function synchroniserNotion(force) {
+    if (!RELAIS || !donnees || !Array.isArray(donnees.projets)) return Promise.resolve();
+    if (synchroEnCours) return synchroEnCours;
+    if (!force && Date.now() - derniereSynchro < 30000) return Promise.resolve();
+    synchroEnCours = (async () => {
+      try {
+        await jetonPret;
+        if (!jeton) return;
+        const r = await fetch(RELAIS + '/projets', { headers: { Authorization: 'Bearer ' + jeton }, cache: 'no-store' });
+        if (r.status === 501) { indiquerSynchro(null); return; }
+        if (!r.ok) throw new Error('Erreur ' + r.status);
+        const j = await r.json();
+        derniereSynchro = Date.now();
+        if (appliquerNotion(Array.isArray(j.projets) ? j.projets : [])) {
+          contexteTexte = construireContexte(donnees);
+          if (window.PILOTAGE && window.PILOTAGE.charger) window.PILOTAGE.charger(donnees);
+        }
+        indiquerSynchro('ok');
+      } catch (e) {
+        indiquerSynchro('erreur');
+      } finally {
+        synchroEnCours = null;
+      }
+    })();
+    return synchroEnCours;
+  }
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') synchroniserNotion(false); });
+  setInterval(() => { if (document.visibilityState === 'visible') synchroniserNotion(true); }, 120000);
+
   // Appelé par acces.js une fois les données déchiffrées.
   window.ASSISTANT = {
-    activer(mdp, paquet) {
+    activer(mdp, paquet, publie) {
       donnees = paquet || {};
+      publieLe = Date.parse(publie || '') || 0;
       contexteTexte = construireContexte(donnees);
       jetonPret = deriver(mdp).then((h) => { jeton = h; return h; }).catch(() => null);
+      synchroniserNotion(true);
       racine.hidden = false;
       racine.classList.add('ia-appel');
       requestAnimationFrame(majMode);
       if (voixActive && window.GERI_VOIX) setTimeout(() => window.GERI_VOIX.prechauffer(), 1200);
     },
     contexte: () => contexteTexte,
+    synchroniser: () => synchroniserNotion(true),
     pourLaVoix,
   };
 })();

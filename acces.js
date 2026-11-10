@@ -37,7 +37,7 @@
     }
     window.PILOTAGE.charger(paquet);
     // L'assistant dérive son jeton d'accès du mot de passe ; le mot de passe lui-même n'est pas envoyé.
-    if (window.ASSISTANT) window.ASSISTANT.activer(mdp, paquet);
+    if (window.ASSISTANT) window.ASSISTANT.activer(mdp, paquet, env.publie_le);
     ecran.classList.add('acces-ouvert');
     setTimeout(() => { ecran.hidden = true; }, 700);
     document.body.classList.remove('verrouille');

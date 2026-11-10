@@ -1,10 +1,12 @@
 // Relais IA du tableau de pilotage.
 // POST /discuter  { messages: [{ role, content }], contexte, nom }  →  { reponse, suggestions, fournisseur, modele }
 // GET  /          état du relais (fournisseur et modèle actifs), sans aucune donnée.
+// GET  /projets   décisions et champs partagés des fiches Notion, lus en direct (jeton requis).
+// POST /notion    mise à jour d'une fiche, confirmée par l'utilisateur (jeton requis).
 
 import { appeler, decrireFournisseur, ErreurConfig, ErreurQuota } from './fournisseurs.js';
 import { consignes, analyser, validerNotion } from './consignes.js';
-import { ecrireNotion, ErreurNotion } from './notion.js';
+import { ecrireNotion, lireProjets, ErreurNotion } from './notion.js';
 
 const LIMITES = { corps: 96000, historique: 14, message: 2000, contexte: 30000 };
 
@@ -25,6 +27,17 @@ export default {
         return json({ service: 'Relais IA du pilotage', fournisseur: cfg.nom, modele: cfg.modele, notion: !!(env.NOTION_CLE && env.NOTION_SOURCE), pret: true }, 200, cors);
       } catch (e) {
         return json({ service: 'Relais IA du pilotage', pret: false, erreur: e.message }, 200, cors);
+      }
+    }
+    if (url.pathname === '/projets' && request.method === 'GET') {
+      if (!(await jetonValide(request, env))) return json({ erreur: 'Accès refusé.' }, 401, cors);
+      if (!env.NOTION_CLE || !env.NOTION_SOURCE) return json({ erreur: 'Notion n’est pas encore branché.' }, 501, cors);
+      try {
+        return json({ projets: await lireProjets(env), lu_le: new Date().toISOString() }, 200, cors);
+      } catch (e) {
+        console.error('notion', e && (e.stack || e.message || e));
+        if (e instanceof ErreurNotion) return json({ erreur: e.message }, e.statut || 502, cors);
+        return json({ erreur: 'Notion n’a pas répondu.' }, 502, cors);
       }
     }
     if (url.pathname === '/notion' && request.method === 'POST') {

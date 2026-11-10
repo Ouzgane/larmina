@@ -272,3 +272,36 @@ test('historique : une longue réponse passée est abrégée au lieu de bloquer'
   const tropLong = { messages: [{ role: 'user', content: 'y'.repeat(2500) }], contexte: '', nom: 'Geri' };
   assert.equal((await relais.fetch(requete(tropLong), env)).status, 413);
 });
+
+test('projets : lecture en direct des fiches Notion, jeton requis', async () => {
+  const { env } = envDe({ NOTION_CLE: 'secret_x', NOTION_SOURCE: 'source-1' });
+  const t = (s) => [{ plain_text: s }];
+  const page = (id, props, extra = {}) => ({ object: 'page', id, url: 'https://www.notion.so/' + id, last_edited_time: '2026-11-10T08:06:57.000Z', properties: props, ...extra });
+  const pages1 = [
+    page('p1', { Projet: { title: t('Trader 5.0') }, 'Décision': { select: null }, Statut: { select: { name: 'En pause' } }, 'Prochaine étape': { rich_text: t('Décider ') .concat(t('de la suite')) }, 'Échéance': { date: null }, Blocages: { rich_text: [] }, 'Résumé': { rich_text: t('Plateforme') }, 'Objectif revenu mensuel (€)': { number: null }, 'Avancement (%)': { number: 35 }, 'Étape': { select: { name: 'Construction' } }, 'Dernière activité': { date: { start: '2026-09-29' } }, Sources: { rich_text: [{ plain_text: 'artefact', href: 'https://claude.ai/artifact/x' }] } }),
+    page('p2', { Projet: { title: t('Corbeille') } }, { in_trash: true }),
+  ];
+  const pages2 = [page('p3', { Projet: { title: t('KitVital') }, 'Décision': { select: { name: 'Accélérer' } }, 'Échéance': { date: { start: '2026-11-20' } }, 'Objectif revenu mensuel (€)': { number: 300 } })];
+  const appels = [];
+  const avant = globalThis.fetch;
+  globalThis.fetch = async (url, init) => {
+    const corps = JSON.parse(init.body);
+    appels.push(corps);
+    return corps.start_cursor ? repJson({ results: pages2, has_more: false }) : repJson({ results: pages1, has_more: true, next_cursor: 'c2' });
+  };
+  try {
+    const r = await relais.fetch(requete(null, { methode: 'GET', chemin: '/projets' }), env);
+    const j = await r.json();
+    assert.equal(r.status, 200, JSON.stringify(j));
+    assert.equal(r.headers.get('Cache-Control'), 'no-store');
+    assert.equal(j.projets.length, 2);
+    assert.deepEqual(j.projets[0], { nom: 'Trader 5.0', url: 'https://www.notion.so/p1', modifie_le: '2026-11-10T08:06:57.000Z', decision: null, statut: 'En pause', objectif_mensuel: null, prochaine_etape: 'Décider de la suite', echeance: null, blocages: '', resume: 'Plateforme',
+      avancement: 35, etape: 'Construction', dynamique: null, recommandation: null, potentiel: null, effort: null, automatisations: null, derniere_activite: '2026-09-29', modele_revenu: '', pole: null, lien: 'https://claude.ai/artifact/x' });
+    assert.equal(j.projets[1].decision, 'Accélérer');
+    assert.equal(j.projets[1].echeance, '2026-11-20');
+    assert.equal(j.projets[1].objectif_mensuel, 300);
+    assert.equal(appels[1].start_cursor, 'c2');
+  } finally { globalThis.fetch = avant; }
+  assert.equal((await relais.fetch(requete(null, { methode: 'GET', chemin: '/projets', jeton: 'c'.repeat(64) }), env)).status, 401);
+  assert.equal((await relais.fetch(requete(null, { methode: 'GET', chemin: '/projets' }), envDe().env)).status, 501);
+});
