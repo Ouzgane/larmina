@@ -2,7 +2,7 @@
 // Ce fichier ne dépend d'aucun fournisseur : on peut changer de modèle sans y toucher.
 
 export const DECISIONS = ['À arbitrer', 'Accélérer', 'Maintenir', 'Mettre en pause', 'Arrêter'];
-export const STATUTS = ['Actif', 'Accéléré', 'En pause', 'Idée', 'Arrêté'];
+export const STATUTS = ['Actif', 'Accéléré', 'En pause', 'Analyse en cours', 'Idée', 'Arrêté'];
 
 export function consignes({ nom, date, contexte, playlists = [], notion = false }) {
   const musique = playlists.length
