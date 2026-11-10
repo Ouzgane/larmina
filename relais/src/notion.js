@@ -111,7 +111,7 @@ export async function lireProjets(env) {
 
 // Rapports du matin (une fiche par jour) : le site affiche le plus récent comme briefing du jour,
 // même quand la copie chiffrée du dépôt n'a pas pu être republiée.
-export async function lireRapports(env, nombre = 30) {
+export async function lireRapports(env, nombre = 100) {
   const r = await appel(env, `/data_sources/${env.NOTION_RAPPORTS}/query`, 'POST', {
     page_size: Math.min(Math.max(nombre, 1), 100),
     sorts: [{ property: 'Date', direction: 'descending' }],
