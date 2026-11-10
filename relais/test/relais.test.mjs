@@ -317,7 +317,7 @@ test('projets : rapports du matin lus dans Notion, sans bloquer les fiches s’i
       if (!rapportsLisibles) return repJson({ message: 'Could not find' }, 404);
       assert.deepEqual(JSON.parse(init.body).sorts, [{ property: 'Date', direction: 'descending' }]);
       return repJson({ results: [
-        { object: 'page', last_edited_time: '2026-11-10T13:40:00.000Z', properties: { Date: { date: { start: '2026-11-10' } }, Titre: { rich_text: t('Titre du jour') }, 'Synthèse': { rich_text: t('Synthèse') }, Arbitrages: { rich_text: t('Accélérer A\nPause B') }, Alertes: { rich_text: [] }, Avancements: { rich_text: t('kitvital=58; trader5 = 35 %; faux; x=abc') } } },
+        { object: 'page', last_edited_time: '2026-11-10T13:40:00.000Z', properties: { Date: { date: { start: '2026-11-10' } }, Titre: { rich_text: t('Titre du jour') }, 'Synthèse': { rich_text: t('Synthèse') }, Arbitrages: { rich_text: t('Accélérer A\nPause B') }, Alertes: { rich_text: [] }, Avancements: { rich_text: t('kitvital=58; trader5 = 35 %; faux; x=abc') }, Encaissements: { rich_text: t('2026-11-10;kitvital;12,50;Affiliation;Amazon; panier\nligne fausse') } } },
         { object: 'page', properties: { Date: { date: null } } },
       ] });
     }
@@ -328,7 +328,8 @@ test('projets : rapports du matin lus dans Notion, sans bloquer les fiches s’i
     assert.equal(j.projets[0].fait, 'Fait');
     assert.equal(j.projets[0].risques, 'Risque');
     assert.equal(j.rapports.length, 1);
-    assert.deepEqual(j.rapports[0], { date: '2026-11-10', modifie_le: '2026-11-10T13:40:00.000Z', titre: 'Titre du jour', synthese: 'Synthèse', arbitrages: 'Accélérer A\nPause B', alertes: '', avancements: { kitvital: 58, trader5: 35 } });
+    assert.deepEqual(j.rapports[0], { date: '2026-11-10', modifie_le: '2026-11-10T13:40:00.000Z', titre: 'Titre du jour', synthese: 'Synthèse', arbitrages: 'Accélérer A\nPause B', alertes: '', avancements: { kitvital: 58, trader5: 35 },
+      encaissements: [{ date: '2026-11-10', projet_id: 'kitvital', montant: 12.5, type: 'Affiliation', note: 'Amazon;panier' }] });
     assert.equal(j.rapports_ok, true);
     rapportsLisibles = false;
     const r = await relais.fetch(requete(null, { methode: 'GET', chemin: '/projets' }), env);

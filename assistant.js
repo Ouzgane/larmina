@@ -742,6 +742,13 @@
         for (const [k, v] of Object.entries(maj)) if (v !== undefined && l[k] !== v) { l[k] = v; change = true; }
       }
     }
+    // Journal des revenus : celui du rapport le plus récent qui le donne (vide = « aucun »).
+    const avecRevenus = rapports.filter((r) => Array.isArray(r.encaissements)).sort((a, b) => String(b.date).localeCompare(String(a.date)))[0];
+    if (avecRevenus) {
+      const noms = new Map((donnees.projets || []).map((p) => [p.id, p.projet]));
+      const neufs = avecRevenus.encaissements.map((e) => ({ date: e.date, projet_id: e.projet_id, projet: noms.get(e.projet_id) || e.projet_id, montant: e.montant, type: e.type || '', note: e.note || '' }));
+      if (JSON.stringify(neufs) !== JSON.stringify(donnees.revenus || [])) { donnees.revenus = neufs; change = true; }
+    }
     if (change) {
       syntheses.sort((a, b) => String(b.date).localeCompare(String(a.date)));
       lignes.sort((a, b) => String(b.date).localeCompare(String(a.date)));

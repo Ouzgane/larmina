@@ -127,9 +127,24 @@ export async function lireRapports(env, nombre = 100) {
       const m = /^\s*([a-z0-9-]{1,40})\s*[=:]\s*(\d{1,3})\s*%?\s*$/i.exec(morceau);
       if (m) avancements[m[1].toLowerCase()] = Math.min(100, Number(m[2]));
     }
+    // Encaissements : null si le champ est vide (inconnu), [] pour « aucun ».
+    const brutEnc = brut(pr.Encaissements);
+    let encaissements = null;
+    if (/^\s*aucun\s*\.?\s*$/i.test(brutEnc)) encaissements = [];
+    else if (brutEnc) {
+      encaissements = [];
+      for (const ligne of brutEnc.split(/\n+/)) {
+        const [d, id, montant, type, ...note] = ligne.split(';').map((x) => x.trim());
+        const m = Number(String(montant || '').replace(/\s/g, '').replace(',', '.').replace(/€$/, ''));
+        if (/^\d{4}-\d{2}-\d{2}$/.test(d || '') && /^[a-z0-9-]{1,40}$/i.test(id || '') && Number.isFinite(m)) {
+          encaissements.push({ date: d, projet_id: id.toLowerCase(), montant: m, type: type || '', note: note.join(';') });
+        }
+      }
+    }
     rapports.push({
       date,
       modifie_le: page.last_edited_time || null,
+      encaissements,
       titre: brut(pr.Titre),
       synthese: brut(pr['Synthèse']),
       arbitrages: brut(pr.Arbitrages),
