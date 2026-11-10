@@ -678,6 +678,7 @@
     for (const f of fiches) {
       if (!f || !f.nom) continue;
       let p = parNom.get(normNom(f.nom));
+      const nouveau = !p;
       if (!p) {
         // Projet ajouté dans Notion depuis le dernier rapport : il apparaît tout de suite.
         const base = normNom(f.nom).replace(/ /g, '-').slice(0, 40) || 'projet';
@@ -694,7 +695,7 @@
       const maj = { decision: f.decision || 'À décider', statut: f.statut || null, objectif_mensuel: typeof f.objectif_mensuel === 'number' ? f.objectif_mensuel : null };
       // Le reste : ce qu'il y a dans Notion si la fiche a été modifiée après la publication du rapport
       // (par toi, par Geri ou par le rapport du matin).
-      if ((Date.parse(f.modifie_le || '') || 0) > publieLe) {
+      if (nouveau || (Date.parse(f.modifie_le || '') || 0) > publieLe) {
         for (const k of CHAMPS_NOTION) {
           if (TEXTES_NOTION.has(k)) maj[k] = f[k] || '';
           else if (k === 'echeance') maj[k] = f[k] || null;
@@ -702,6 +703,48 @@
         }
       }
       for (const [k, v] of Object.entries(maj)) if (p[k] !== v) { p[k] = v; change = true; }
+    }
+    return change;
+  }
+  // Rapports du matin écrits dans Notion : briefing du jour et ligne du jour de chaque projet,
+  // pour que le site soit à jour même si la copie chiffrée du dépôt n'a pas été republiée.
+  function appliquerRapports(rapports, fiches) {
+    if (!rapports.length) return false;
+    const syntheses = donnees.syntheses = Array.isArray(donnees.syntheses) ? donnees.syntheses : [];
+    const lignes = donnees.rapports = Array.isArray(donnees.rapports) ? donnees.rapports : [];
+    const revenus = Array.isArray(donnees.revenus) ? donnees.revenus : [];
+    const cumul = (id) => revenus.filter((r) => r.projet_id === id).reduce((t, r) => t + (Number(String(r.montant).replace(',', '.')) || 0), 0);
+    const parNom = new Map(fiches.map((f) => [normNom(f.nom), f]));
+    const plusRecent = rapports.reduce((a, b) => (b.date > a.date ? b : a));
+    let change = false;
+    for (const r of rapports) {
+      const recent = (Date.parse(r.modifie_le || '') || 0) > publieLe;
+      const i = syntheses.findIndex((x) => x.date === r.date);
+      if (i < 0 || recent) {
+        const s = { date: r.date, titre: r.titre || '', synthese: r.synthese || '', arbitrages: r.arbitrages || '', alertes: r.alertes || '' };
+        if (i < 0) { syntheses.push(s); change = true; }
+        else if (JSON.stringify(syntheses[i]) !== JSON.stringify(s)) { syntheses[i] = s; change = true; }
+      }
+      for (const p of donnees.projets || []) {
+        const av = r.avancements && r.avancements[p.id];
+        let l = lignes.find((x) => x.date === r.date && x.projet_id === p.id);
+        if (!l && typeof av !== 'number') continue;
+        if (!l) { l = { date: r.date, projet_id: p.id, projet: p.projet }; lignes.push(l); change = true; }
+        const maj = {};
+        if (typeof av === 'number') maj.avancement = av;
+        if (r === plusRecent) {
+          // Ligne du jour : complétée par la fiche Notion du projet (fait, risques, étape…).
+          const f = parNom.get(normNom(p.projet));
+          Object.assign(maj, { etape: p.etape, dynamique: p.dynamique, recommandation: p.recommandation, prochaine_etape: p.prochaine_etape, revenu_cumule: cumul(p.id) });
+          if (f && f.fait) maj.fait = f.fait;
+          if (f && f.risques) maj.risques = f.risques;
+        }
+        for (const [k, v] of Object.entries(maj)) if (v !== undefined && l[k] !== v) { l[k] = v; change = true; }
+      }
+    }
+    if (change) {
+      syntheses.sort((a, b) => String(b.date).localeCompare(String(a.date)));
+      lignes.sort((a, b) => String(b.date).localeCompare(String(a.date)));
     }
     return change;
   }
@@ -728,7 +771,10 @@
         if (!r.ok) throw new Error('Erreur ' + r.status);
         const j = await r.json();
         derniereSynchro = Date.now();
-        if (appliquerNotion(Array.isArray(j.projets) ? j.projets : [])) {
+        const fiches = Array.isArray(j.projets) ? j.projets : [];
+        const changeFiches = appliquerNotion(fiches);
+        const changeRapports = appliquerRapports(Array.isArray(j.rapports) ? j.rapports : [], fiches);
+        if (changeFiches || changeRapports) {
           contexteTexte = construireContexte(donnees);
           if (window.PILOTAGE && window.PILOTAGE.charger) window.PILOTAGE.charger(donnees);
         }

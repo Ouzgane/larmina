@@ -98,10 +98,44 @@ export async function lireProjets(env) {
         modele_revenu: brut(pr['Modèle de revenu']),
         pole: choix('Pôle'),
         lien,
+        // Rapport du matin, projet par projet.
+        fait: brut(pr['Fait du jour']),
+        risques: brut(pr.Risques),
       });
     }
     if (!r.has_more || !r.next_cursor) break;
     curseur = r.next_cursor;
   }
   return fiches;
+}
+
+// Rapports du matin (une fiche par jour) : le site affiche le plus récent comme briefing du jour,
+// même quand la copie chiffrée du dépôt n'a pas pu être republiée.
+export async function lireRapports(env, nombre = 30) {
+  const r = await appel(env, `/data_sources/${env.NOTION_RAPPORTS}/query`, 'POST', {
+    page_size: Math.min(Math.max(nombre, 1), 100),
+    sorts: [{ property: 'Date', direction: 'descending' }],
+  });
+  const rapports = [];
+  for (const page of r.results || []) {
+    if (!page || page.object !== 'page' || page.in_trash || page.archived) continue;
+    const pr = page.properties || {};
+    const date = pr.Date && pr.Date.date && pr.Date.date.start ? String(pr.Date.date.start).slice(0, 10) : null;
+    if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) continue;
+    const avancements = {};
+    for (const morceau of brut(pr.Avancements).split(/[;\n]+/)) {
+      const m = /^\s*([a-z0-9-]{1,40})\s*[=:]\s*(\d{1,3})\s*%?\s*$/i.exec(morceau);
+      if (m) avancements[m[1].toLowerCase()] = Math.min(100, Number(m[2]));
+    }
+    rapports.push({
+      date,
+      modifie_le: page.last_edited_time || null,
+      titre: brut(pr.Titre),
+      synthese: brut(pr['Synthèse']),
+      arbitrages: brut(pr.Arbitrages),
+      alertes: brut(pr.Alertes),
+      avancements,
+    });
+  }
+  return rapports;
 }

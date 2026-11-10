@@ -30,6 +30,8 @@ MAX_TOKENS = "1200"
 # Notion : base « Projets » où Geri enregistre les décisions confirmées.
 # La clé de l'intégration Notion est le secret GitHub NOTION_CLE (jamais ici).
 NOTION_SOURCE = "de823e47-5a0f-41b8-8d1e-513008d7cfca"
+# Base « Rapports du matin » : un rapport par jour, affiché en direct sur le site.
+NOTION_RAPPORTS = "b293d117-365a-4d10-a0de-9b0d0ff6a958"
 
 # Sites autorisés à appeler le relais (séparés par des virgules).
 ORIGINES = "https://ouzgane.github.io"

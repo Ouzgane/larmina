@@ -296,7 +296,8 @@ test('projets : lecture en direct des fiches Notion, jeton requis', async () => 
     assert.equal(r.headers.get('Cache-Control'), 'no-store');
     assert.equal(j.projets.length, 2);
     assert.deepEqual(j.projets[0], { nom: 'Trader 5.0', url: 'https://www.notion.so/p1', modifie_le: '2026-11-10T08:06:57.000Z', decision: null, statut: 'En pause', objectif_mensuel: null, prochaine_etape: 'Décider de la suite', echeance: null, blocages: '', resume: 'Plateforme',
-      avancement: 35, etape: 'Construction', dynamique: null, recommandation: null, potentiel: null, effort: null, automatisations: null, derniere_activite: '2026-09-29', modele_revenu: '', pole: null, lien: 'https://claude.ai/artifact/x' });
+      avancement: 35, etape: 'Construction', dynamique: null, recommandation: null, potentiel: null, effort: null, automatisations: null, derniere_activite: '2026-09-29', modele_revenu: '', pole: null, lien: 'https://claude.ai/artifact/x', fait: '', risques: '' });
+    assert.deepEqual(j.rapports, []);
     assert.equal(j.projets[1].decision, 'Accélérer');
     assert.equal(j.projets[1].echeance, '2026-11-20');
     assert.equal(j.projets[1].objectif_mensuel, 300);
@@ -304,4 +305,37 @@ test('projets : lecture en direct des fiches Notion, jeton requis', async () => 
   } finally { globalThis.fetch = avant; }
   assert.equal((await relais.fetch(requete(null, { methode: 'GET', chemin: '/projets', jeton: 'c'.repeat(64) }), env)).status, 401);
   assert.equal((await relais.fetch(requete(null, { methode: 'GET', chemin: '/projets' }), envDe().env)).status, 501);
+});
+
+test('projets : rapports du matin lus dans Notion, sans bloquer les fiches s’ils sont illisibles', async () => {
+  const { env } = envDe({ NOTION_CLE: 'secret_x', NOTION_SOURCE: 'source-1', NOTION_RAPPORTS: 'rapports-1' });
+  const t = (s) => [{ plain_text: s }];
+  let rapportsLisibles = true;
+  const avant = globalThis.fetch;
+  globalThis.fetch = async (url, init) => {
+    if (url.includes('/data_sources/rapports-1/')) {
+      if (!rapportsLisibles) return repJson({ message: 'Could not find' }, 404);
+      assert.deepEqual(JSON.parse(init.body).sorts, [{ property: 'Date', direction: 'descending' }]);
+      return repJson({ results: [
+        { object: 'page', last_edited_time: '2026-11-10T13:40:00.000Z', properties: { Date: { date: { start: '2026-11-10' } }, Titre: { rich_text: t('Titre du jour') }, 'Synthèse': { rich_text: t('Synthèse') }, Arbitrages: { rich_text: t('Accélérer A\nPause B') }, Alertes: { rich_text: [] }, Avancements: { rich_text: t('kitvital=58; trader5 = 35 %; faux; x=abc') } } },
+        { object: 'page', properties: { Date: { date: null } } },
+      ] });
+    }
+    return repJson({ results: [{ object: 'page', url: 'u', properties: { Projet: { title: t('KitVital') }, 'Fait du jour': { rich_text: t('Fait') }, Risques: { rich_text: t('Risque') } } }] });
+  };
+  try {
+    let j = await (await relais.fetch(requete(null, { methode: 'GET', chemin: '/projets' }), env)).json();
+    assert.equal(j.projets[0].fait, 'Fait');
+    assert.equal(j.projets[0].risques, 'Risque');
+    assert.equal(j.rapports.length, 1);
+    assert.deepEqual(j.rapports[0], { date: '2026-11-10', modifie_le: '2026-11-10T13:40:00.000Z', titre: 'Titre du jour', synthese: 'Synthèse', arbitrages: 'Accélérer A\nPause B', alertes: '', avancements: { kitvital: 58, trader5: 35 } });
+    assert.equal(j.rapports_ok, true);
+    rapportsLisibles = false;
+    const r = await relais.fetch(requete(null, { methode: 'GET', chemin: '/projets' }), env);
+    j = await r.json();
+    assert.equal(r.status, 200);
+    assert.equal(j.projets.length, 1);
+    assert.deepEqual(j.rapports, []);
+    assert.equal(j.rapports_ok, false);
+  } finally { globalThis.fetch = avant; }
 });
