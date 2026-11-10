@@ -10,9 +10,14 @@ Version en ligne du tableau de pilotage du portefeuille de projets : revenus, br
 
 ## Mise à jour
 
-Chaque matin, la tâche planifiée « Pilotage des projets : rapport quotidien » met à jour le tableau de bord dans Claude, puis publie ici une nouvelle version chiffrée de ses données.
+Le site lit Notion en direct, par le relais de Geri (`GET /projets`, jeton requis) : à l'ouverture, au retour sur l'onglet, toutes les 2 minutes et après chaque enregistrement par Geri. L'en-tête indique l'heure de la dernière synchronisation.
 
-Publication manuelle, à partir des quatre fichiers du tableau de bord (`projets.json`, `rapports.json`, `syntheses.json`, `revenus.csv`) copiés dans `clair/`, un dossier ignoré par Git :
+- Base **Projets** : décision, statut et objectif toujours repris ; les autres champs dès que la fiche a été modifiée après la publication de la copie chiffrée. Un projet créé dans Notion apparaît aussitôt.
+- Base **Rapports du matin** : briefing du jour (titre, synthèse, arbitrages, alertes), avancement de chaque projet jour après jour et journal des encaissements.
+
+Chaque matin, la tâche planifiée « Pilotage des projets : rapport quotidien » met à jour le tableau de bord dans Claude et écrit le rapport du jour dans ces deux bases : il apparaît sur le site sans republier la copie chiffrée. Les tâches planifiées n'ont pas accès à GitHub.
+
+La copie chiffrée (`donnees/pilotage.chiffre.json`) sert de base de départ et de secours si Notion ne répond pas. Publication manuelle, à partir des quatre fichiers du tableau de bord (`projets.json`, `rapports.json`, `syntheses.json`, `revenus.csv`) copiés dans `clair/`, un dossier ignoré par Git :
 
 ```sh
 PILOTAGE_MDP='…' node outils/publier.mjs clair
@@ -47,7 +52,7 @@ Demande « mets du jazz », « de quoi me concentrer » ou colle un lien Spotify
 
 Quand tu annonces une décision ou un changement (« je mets Tablée en pause jusqu'en janvier »), Geri propose une carte **« Enregistrer dans Notion »** : rien n'est écrit sans ton clic. Champs modifiables : Décision, Statut, Prochaine étape, Échéance, Blocages, Résumé, dans la base **Projets** de la page « Pilotage des projets ». Le tableau se met à jour aussitôt ; le rapport du matin reprend ces valeurs depuis Notion.
 
-Mise en service : créer une intégration Notion interne (notion.so/profile/integrations, droits « lire » et « modifier le contenu »), la connecter à la page « Pilotage des projets » (menu ••• → Connexions), mettre son secret dans le secret GitHub `NOTION_CLE`, puis relancer le workflow « Relais IA ».
+Mise en service : créer une intégration Notion interne (notion.so/profile/integrations, droits « lire » et « modifier le contenu »), lui donner accès aux bases « Projets » et « Rapports du matin » (onglet « Content access »), mettre son secret dans le secret GitHub `NOTION_CLE`, puis relancer le workflow « Relais IA ». Les identifiants des deux bases sont `NOTION_SOURCE` et `NOTION_RAPPORTS` dans `relais/wrangler.toml`.
 
 ### Modèle actuel
 
